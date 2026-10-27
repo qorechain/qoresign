@@ -79,6 +79,24 @@ if qoresign.IsCode(err, qoresign.CodeSiwqExpired) {
 account's registered ML-DSA-87 public key. A classical-only sign-in is refused
 unless `RequirePq` points to `false`.
 
+## Sign a message
+
+```go
+data := []byte("Approve export of report 2026-10")
+sig, err := qoresign.SignMessage(qoresign.SignMessageArgs{
+	ChainID: "qorechain-vladi", Signer: account.Bech32, Data: data,
+	ClassicalKey: classical, PqKey: &pqKey,
+})
+// json.Marshal(sig) gives the JSON shape every implementation exchanges.
+
+// On the server, against the ML-DSA-87 key the signer registered on chain:
+_, err = client.VerifyMessageWithChain(ctx, qoresign.VerifyMessageOptions{
+	ChainID: "qorechain-vladi", Signer: account.Bech32, Data: data, Signature: sig,
+})
+```
+
+`qoresign.VerifyMessage` does the same checks offline given `PqPublicKey`.
+
 ## Errors
 
 Every intentional error is a `*qoresign.Error` with a stable `Code` (the same

@@ -231,6 +231,48 @@ class VectorTest {
     }
 
     @Test
+    fun message() {
+        val m = vectors.getValue("message")
+        assertEquals(address, m.str("signer"))
+        val cases = m.jsonObject.getValue("cases").jsonArray
+        assertEquals(2, cases.size)
+        for (c in cases) {
+            val data = c.str("data").unhex()
+            c.jsonObject["text"]?.let { assertArrayEquals(it.jsonPrimitive.content.encodeToByteArray(), data) }
+            assertEquals(c.str("adr36SignBytes"), adr36SignBytes(address, data).hex())
+            assertEquals(c.str("pqSignBytes"), messagePqSignBytes(chainId, data).hex())
+
+            val signature = signMessage(chainId, address, data, classical, pq)
+            val expected = c.jsonObject.getValue("signature")
+            assertEquals(expected, Json.parseToJsonElement(messageSignatureToJson(signature)))
+            val fromVector = messageSignatureFromJson(expected.toString())
+            assertEquals(signature, fromVector)
+            assertEquals(MessageSignatureType.ML_DSA87_HYBRID, fromVector.signatureType)
+            verifyMessage(chainId, address, data, fromVector, pq.publicKey)
+
+            fun code(
+                chain: String = chainId,
+                bytes: ByteArray = data,
+                key: ByteArray? = pq.publicKey,
+                sig: MessageSignature = fromVector,
+                requirePq: Boolean = true,
+            ) = errorCode { verifyMessage(chain, address, bytes, sig, key, requirePq) }
+            assertEquals("PQ_SIGNATURE_INVALID", code(chain = "qorechain-vladi"))
+            assertEquals("INVALID_ARGUMENT", code(chain = "bad chain"))
+            assertEquals("CLASSICAL_SIGNATURE_INVALID", code(bytes = "x".encodeToByteArray()))
+            assertEquals("KEY_NOT_REGISTERED", code(key = null))
+            val classicalOnly = MessageSignature(MessageSignatureType.SECP256K1, fromVector.classical)
+            assertEquals("PQ_LAYER_MISSING", code(sig = classicalOnly))
+            assertNull(code(sig = classicalOnly, key = null, requirePq = false))
+            val unsupported = fromVector.copy(pq = fromVector.pq!!.copy(algorithmId = 2u))
+            assertEquals("UNSUPPORTED_ALGORITHM", code(sig = unsupported))
+        }
+        val eth = deriveClassicalKey(mnemonic, ClassicalKeyType.ETH_SECP256K1)
+        assertEquals("ADDRESS_MISMATCH", errorCode { signMessage(chainId, address, "x".encodeToByteArray(), eth) })
+        assertEquals("INVALID_ARGUMENT", errorCode { messageSignatureFromJson("{}") })
+    }
+
+    @Test
     fun lanes() {
         assertEquals(LaneSupport.HYBRID, laneSupport(Lane.NATIVE))
         assertEquals(LaneSupport.QUANTUM_READY, laneSupport(Lane.EVM))

@@ -56,6 +56,16 @@ val result = verifyHybridTx(
 check(result.valid)
 ```
 
+Sign arbitrary data (`signArbitrary` style, spec/message-signing-v1.md):
+
+```kotlin
+val data = "Approve export of report 2026-10".encodeToByteArray()
+val sig = signMessage("qorechain-vladi", account.bech32, data, classical, pqKey)
+val json = messageSignatureToJson(sig) // shared JSON shape
+// pqPublicKey: the key registered on chain for the signer.
+verifyMessage("qorechain-vladi", account.bech32, data, messageSignatureFromJson(json), pqKey.publicKey)
+```
+
 Errors are `QoreSignException`; `code` is the stable code shared by every
 implementation:
 

@@ -383,6 +383,81 @@ fn siwq() {
 }
 
 #[test]
+fn message() {
+    let c = ctx();
+    let m = &c.v["message"];
+    assert_eq!(s(m, "signer"), c.address);
+    for case in m["cases"].as_array().unwrap() {
+        let data = h(case, "data");
+        assert_eq!(
+            hex::encode(adr36_sign_bytes(c.address.clone(), data.clone())),
+            s(case, "adr36SignBytes")
+        );
+        assert_eq!(
+            hex::encode(message_pq_sign_bytes(c.chain_id.clone(), data.clone()).unwrap()),
+            s(case, "pqSignBytes")
+        );
+        let sig = sign_message(
+            c.chain_id.clone(),
+            c.address.clone(),
+            data.clone(),
+            c.classical.clone(),
+            Some(c.pq.clone()),
+            false,
+        )
+        .unwrap();
+        let json: Value =
+            serde_json::from_str(&message_signature_to_json(sig.clone()).unwrap()).unwrap();
+        assert_eq!(json, case["signature"]);
+        let from_vector = message_signature_from_json(case["signature"].to_string()).unwrap();
+        assert_eq!(from_vector, sig);
+        let verify = |chain_id: &str, data: Vec<u8>, pq: Option<Vec<u8>>| {
+            verify_message(
+                chain_id.into(),
+                c.address.clone(),
+                data,
+                from_vector.clone(),
+                pq,
+                true,
+            )
+        };
+        verify(&c.chain_id, data.clone(), Some(c.pq.public_key.clone())).unwrap();
+        assert_eq!(
+            code(verify(
+                "qorechain-vladi",
+                data.clone(),
+                Some(c.pq.public_key.clone())
+            )),
+            "PQ_SIGNATURE_INVALID"
+        );
+        assert_eq!(
+            code(verify(
+                "bad chain",
+                data.clone(),
+                Some(c.pq.public_key.clone())
+            )),
+            "INVALID_ARGUMENT"
+        );
+        assert_eq!(
+            code(verify(&c.chain_id, data.clone(), None)),
+            "KEY_NOT_REGISTERED"
+        );
+        assert_eq!(
+            code(verify(
+                &c.chain_id,
+                b"x".to_vec(),
+                Some(c.pq.public_key.clone())
+            )),
+            "CLASSICAL_SIGNATURE_INVALID"
+        );
+    }
+    assert_eq!(
+        code(message_signature_from_json("{}".into())),
+        "INVALID_ARGUMENT"
+    );
+}
+
+#[test]
 fn lanes() {
     assert_eq!(lane_support(Lane::Native), LaneSupport::Hybrid);
     assert_eq!(lane_support(Lane::Evm), LaneSupport::QuantumReady);

@@ -58,6 +58,18 @@ let result = try verifyHybridTx(
 assert(result.valid)
 ```
 
+Sign arbitrary data (`signArbitrary` style, spec/message-signing-v1.md):
+
+```swift
+let data = Data("Approve export of report 2026-10".utf8)
+let sig = try signMessage(chainId: "qorechain-vladi", signer: account.bech32, data: data,
+                          classicalKey: classical, pqKey: pqKey)
+let json = try messageSignatureToJson(signature: sig) // shared JSON shape
+// pqPublicKey: the key registered on chain for the signer.
+try verifyMessage(chainId: "qorechain-vladi", signer: account.bech32, data: data,
+                  signature: try messageSignatureFromJson(json: json), pqPublicKey: pqKey.publicKey)
+```
+
 Errors are `QoreSignError`; `code` is the stable code shared by every
 implementation:
 

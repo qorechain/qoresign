@@ -252,6 +252,55 @@ final class VectorTests: XCTestCase {
         XCTAssertEqual(errorCode { _ = try parseSiwqMessage(message: "hello") }, "SIWQ_MALFORMED")
     }
 
+    func testMessage() throws {
+        let m = v["message"] as! [String: Any]
+        XCTAssertEqual(m["signer"] as? String, address)
+        let cases = m["cases"] as! [[String: Any]]
+        XCTAssertEqual(cases.count, 2)
+        for c in cases {
+            let data = unhex(c["data"] as! String)
+            if let text = c["text"] as? String {
+                XCTAssertEqual(Data(text.utf8), data)
+            }
+            XCTAssertEqual(hex(adr36SignBytes(signer: address, data: data)), c["adr36SignBytes"] as? String)
+            XCTAssertEqual(hex(try messagePqSignBytes(chainId: chainId, data: data)), c["pqSignBytes"] as? String)
+
+            let signature = try signMessage(chainId: chainId, signer: address, data: data, classicalKey: classical, pqKey: pq)
+            let expected = c["signature"] as! [String: Any]
+            let json = try JSONSerialization.jsonObject(with: Data(try messageSignatureToJson(signature: signature).utf8))
+            XCTAssertEqual(json as? NSDictionary, expected as NSDictionary)
+            let vectorJson = String(data: try JSONSerialization.data(withJSONObject: expected), encoding: .utf8)!
+            let fromVector = try messageSignatureFromJson(json: vectorJson)
+            XCTAssertEqual(fromVector, signature)
+            XCTAssertEqual(fromVector.signatureType, .mlDsa87Hybrid)
+            try verifyMessage(chainId: chainId, signer: address, data: data, signature: fromVector, pqPublicKey: pq.publicKey)
+
+            func verifyCode(chainId: String? = nil, data: Data? = nil, pqPublicKey: Data?,
+                            signature: MessageSignature, requirePq: Bool = true) -> String? {
+                errorCode {
+                    try verifyMessage(chainId: chainId ?? self.chainId, signer: self.address, data: data ?? unhex(c["data"] as! String),
+                                      signature: signature, pqPublicKey: pqPublicKey, requirePq: requirePq)
+                }
+            }
+            XCTAssertEqual(verifyCode(chainId: "qorechain-vladi", pqPublicKey: pq.publicKey, signature: fromVector), "PQ_SIGNATURE_INVALID")
+            XCTAssertEqual(verifyCode(chainId: "bad chain", pqPublicKey: pq.publicKey, signature: fromVector), "INVALID_ARGUMENT")
+            XCTAssertEqual(verifyCode(data: Data("x".utf8), pqPublicKey: pq.publicKey, signature: fromVector), "CLASSICAL_SIGNATURE_INVALID")
+            XCTAssertEqual(verifyCode(pqPublicKey: nil, signature: fromVector), "KEY_NOT_REGISTERED")
+            let classicalOnly = MessageSignature(signatureType: .secp256k1, classical: fromVector.classical)
+            XCTAssertEqual(verifyCode(pqPublicKey: pq.publicKey, signature: classicalOnly), "PQ_LAYER_MISSING")
+            XCTAssertNil(verifyCode(pqPublicKey: nil, signature: classicalOnly, requirePq: false))
+            let unsupported = MessageSignature(
+                signatureType: .mlDsa87Hybrid, classical: fromVector.classical,
+                pq: MessagePqSignature(algorithmId: 2, signature: fromVector.pq!.signature))
+            XCTAssertEqual(verifyCode(pqPublicKey: pq.publicKey, signature: unsupported), "UNSUPPORTED_ALGORITHM")
+        }
+        let eth = try deriveClassicalKey(mnemonic: mnemonic, keyType: .ethSecp256k1)
+        XCTAssertEqual(errorCode {
+            _ = try signMessage(chainId: self.chainId, signer: self.address, data: Data("x".utf8), classicalKey: eth)
+        }, "ADDRESS_MISMATCH")
+        XCTAssertEqual(errorCode { _ = try messageSignatureFromJson(json: "{}") }, "INVALID_ARGUMENT")
+    }
+
     func testLanes() throws {
         XCTAssertEqual(laneSupport(lane: .native), .hybrid)
         XCTAssertEqual(laneSupport(lane: .evm), .quantumReady)

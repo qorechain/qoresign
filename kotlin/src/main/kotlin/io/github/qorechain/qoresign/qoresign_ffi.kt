@@ -779,6 +779,16 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
+
+
+
+
+
+
+
+
 // For large crates we prevent `MethodTooLargeException` (see #2340)
 // N.B. the name of the extension is very misleading, since it is 
 // rather `InterfaceTooLargeException`, caused by too many methods 
@@ -832,6 +842,12 @@ fun uniffi_qoresign_ffi_checksum_func_is_degenerate_pq_public_key(
 ): Short
 fun uniffi_qoresign_ffi_checksum_func_lane_support(
 ): Short
+fun uniffi_qoresign_ffi_checksum_func_message_pq_sign_bytes(
+): Short
+fun uniffi_qoresign_ffi_checksum_func_message_signature_from_json(
+): Short
+fun uniffi_qoresign_ffi_checksum_func_message_signature_to_json(
+): Short
 fun uniffi_qoresign_ffi_checksum_func_parse_address(
 ): Short
 fun uniffi_qoresign_ffi_checksum_func_parse_siwq_message(
@@ -841,6 +857,8 @@ fun uniffi_qoresign_ffi_checksum_func_pq_key_from_seed(
 fun uniffi_qoresign_ffi_checksum_func_proof_of_possession_message(
 ): Short
 fun uniffi_qoresign_ffi_checksum_func_sign_hybrid(
+): Short
+fun uniffi_qoresign_ffi_checksum_func_sign_message(
 ): Short
 fun uniffi_qoresign_ffi_checksum_func_sign_pq_layer(
 ): Short
@@ -855,6 +873,8 @@ fun uniffi_qoresign_ffi_checksum_func_siwq_signature_from_json(
 fun uniffi_qoresign_ffi_checksum_func_siwq_signature_to_json(
 ): Short
 fun uniffi_qoresign_ffi_checksum_func_verify_hybrid_tx(
+): Short
+fun uniffi_qoresign_ffi_checksum_func_verify_message(
 ): Short
 fun uniffi_qoresign_ffi_checksum_func_verify_pq_layer(
 ): Short
@@ -945,6 +965,12 @@ fun uniffi_qoresign_ffi_fn_func_is_degenerate_pq_public_key(`publicKey`: RustBuf
 ): Byte
 fun uniffi_qoresign_ffi_fn_func_lane_support(`lane`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
+fun uniffi_qoresign_ffi_fn_func_message_pq_sign_bytes(`chainId`: RustBuffer.ByValue,`data`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_qoresign_ffi_fn_func_message_signature_from_json(`json`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_qoresign_ffi_fn_func_message_signature_to_json(`signature`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
 fun uniffi_qoresign_ffi_fn_func_parse_address(`address`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_qoresign_ffi_fn_func_parse_siwq_message(`message`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -954,6 +980,8 @@ fun uniffi_qoresign_ffi_fn_func_pq_key_from_seed(`seed`: RustBuffer.ByValue,unif
 fun uniffi_qoresign_ffi_fn_func_proof_of_possession_message(`chainId`: RustBuffer.ByValue,`account`: RustBuffer.ByValue,`publicKey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_qoresign_ffi_fn_func_sign_hybrid(`chainId`: RustBuffer.ByValue,`accountNumber`: Long,`bodyBytes`: RustBuffer.ByValue,`authInfoBytes`: RustBuffer.ByValue,`classicalKey`: RustBuffer.ByValue,`pqKey`: RustBuffer.ByValue,`mode`: RustBuffer.ByValue,`options`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_qoresign_ffi_fn_func_sign_message(`chainId`: RustBuffer.ByValue,`signer`: RustBuffer.ByValue,`data`: RustBuffer.ByValue,`classicalKey`: RustBuffer.ByValue,`pqKey`: RustBuffer.ByValue,`hedged`: Byte,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_qoresign_ffi_fn_func_sign_pq_layer(`chainId`: RustBuffer.ByValue,`bodyBytes`: RustBuffer.ByValue,`authInfoBytes`: RustBuffer.ByValue,`pqKey`: RustBuffer.ByValue,`options`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
@@ -969,6 +997,8 @@ fun uniffi_qoresign_ffi_fn_func_siwq_signature_to_json(`signature`: RustBuffer.B
 ): RustBuffer.ByValue
 fun uniffi_qoresign_ffi_fn_func_verify_hybrid_tx(`txBytes`: RustBuffer.ByValue,`chainId`: RustBuffer.ByValue,`accountNumber`: Long,`classicalPublicKey`: RustBuffer.ByValue,`pqPublicKey`: RustBuffer.ByValue,`classicalKeyType`: RustBuffer.ByValue,`version`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
+fun uniffi_qoresign_ffi_fn_func_verify_message(`chainId`: RustBuffer.ByValue,`signer`: RustBuffer.ByValue,`data`: RustBuffer.ByValue,`signature`: RustBuffer.ByValue,`pqPublicKey`: RustBuffer.ByValue,`requirePq`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+): Unit
 fun uniffi_qoresign_ffi_fn_func_verify_pq_layer(`chainId`: RustBuffer.ByValue,`bodyBytes`: RustBuffer.ByValue,`authInfoBytes`: RustBuffer.ByValue,`pqPublicKey`: RustBuffer.ByValue,`version`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_qoresign_ffi_fn_func_verify_proof_of_possession(`chainId`: RustBuffer.ByValue,`account`: RustBuffer.ByValue,`publicKey`: RustBuffer.ByValue,`proof`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -1158,6 +1188,15 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_qoresign_ffi_checksum_func_lane_support() != 56640.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_qoresign_ffi_checksum_func_message_pq_sign_bytes() != 9363.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_qoresign_ffi_checksum_func_message_signature_from_json() != 20275.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_qoresign_ffi_checksum_func_message_signature_to_json() != 35014.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_qoresign_ffi_checksum_func_parse_address() != 8921.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1171,6 +1210,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_qoresign_ffi_checksum_func_sign_hybrid() != 56890.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_qoresign_ffi_checksum_func_sign_message() != 41999.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_qoresign_ffi_checksum_func_sign_pq_layer() != 28444.toShort()) {
@@ -1192,6 +1234,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_qoresign_ffi_checksum_func_verify_hybrid_tx() != 17065.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_qoresign_ffi_checksum_func_verify_message() != 8019.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_qoresign_ffi_checksum_func_verify_pq_layer() != 25685.toShort()) {
@@ -1759,6 +1804,129 @@ public object FfiConverterTypeLayerStateInput: FfiConverterRustBuffer<LayerState
             FfiConverterBoolean.write(value.`onQoreChain`, buf)
             FfiConverterBoolean.write(value.`signedWithPqLayer`, buf)
             FfiConverterOptionalSequenceString.write(value.`committedExtensionTypeUrls`, buf)
+    }
+}
+
+
+
+/**
+ * Classical part of a [`MessageSignature`].
+ */
+data class MessageClassicalSignature (
+    val `keyType`: ClassicalKeyType, 
+    /**
+     * Base64 compressed public key.
+     */
+    val `publicKey`: kotlin.String, 
+    /**
+     * Base64 64-byte signature over the ADR-36 sign document of the message.
+     */
+    val `signature`: kotlin.String
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMessageClassicalSignature: FfiConverterRustBuffer<MessageClassicalSignature> {
+    override fun read(buf: ByteBuffer): MessageClassicalSignature {
+        return MessageClassicalSignature(
+            FfiConverterTypeClassicalKeyType.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: MessageClassicalSignature) = (
+            FfiConverterTypeClassicalKeyType.allocationSize(value.`keyType`) +
+            FfiConverterString.allocationSize(value.`publicKey`) +
+            FfiConverterString.allocationSize(value.`signature`)
+    )
+
+    override fun write(value: MessageClassicalSignature, buf: ByteBuffer) {
+            FfiConverterTypeClassicalKeyType.write(value.`keyType`, buf)
+            FfiConverterString.write(value.`publicKey`, buf)
+            FfiConverterString.write(value.`signature`, buf)
+    }
+}
+
+
+
+/**
+ * ML-DSA-87 part of a [`MessageSignature`].
+ */
+data class MessagePqSignature (
+    val `algorithmId`: kotlin.UInt, 
+    /**
+     * Base64 ML-DSA-87 signature over [`message_pq_sign_bytes`].
+     */
+    val `signature`: kotlin.String
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMessagePqSignature: FfiConverterRustBuffer<MessagePqSignature> {
+    override fun read(buf: ByteBuffer): MessagePqSignature {
+        return MessagePqSignature(
+            FfiConverterUInt.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: MessagePqSignature) = (
+            FfiConverterUInt.allocationSize(value.`algorithmId`) +
+            FfiConverterString.allocationSize(value.`signature`)
+    )
+
+    override fun write(value: MessagePqSignature, buf: ByteBuffer) {
+            FfiConverterUInt.write(value.`algorithmId`, buf)
+            FfiConverterString.write(value.`signature`, buf)
+    }
+}
+
+
+
+/**
+ * A message signature; [`message_signature_to_json`] gives the JSON shape
+ * shared by every implementation.
+ */
+data class MessageSignature (
+    val `signatureType`: MessageSignatureType, 
+    val `classical`: MessageClassicalSignature, 
+    val `pq`: MessagePqSignature? = null
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMessageSignature: FfiConverterRustBuffer<MessageSignature> {
+    override fun read(buf: ByteBuffer): MessageSignature {
+        return MessageSignature(
+            FfiConverterTypeMessageSignatureType.read(buf),
+            FfiConverterTypeMessageClassicalSignature.read(buf),
+            FfiConverterOptionalTypeMessagePqSignature.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: MessageSignature) = (
+            FfiConverterTypeMessageSignatureType.allocationSize(value.`signatureType`) +
+            FfiConverterTypeMessageClassicalSignature.allocationSize(value.`classical`) +
+            FfiConverterOptionalTypeMessagePqSignature.allocationSize(value.`pq`)
+    )
+
+    override fun write(value: MessageSignature, buf: ByteBuffer) {
+            FfiConverterTypeMessageSignatureType.write(value.`signatureType`, buf)
+            FfiConverterTypeMessageClassicalSignature.write(value.`classical`, buf)
+            FfiConverterOptionalTypeMessagePqSignature.write(value.`pq`, buf)
     }
 }
 
@@ -2387,6 +2555,39 @@ public object FfiConverterTypeLayerState: FfiConverterRustBuffer<LayerState> {
 
 
 /**
+ * `MlDsa87Hybrid` (`ml-dsa-87-hybrid`) for both parts; `Secp256k1` for a classical-only signature.
+ */
+
+enum class MessageSignatureType {
+    
+    ML_DSA87_HYBRID,
+    SECP256K1;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMessageSignatureType: FfiConverterRustBuffer<MessageSignatureType> {
+    override fun read(buf: ByteBuffer) = try {
+        MessageSignatureType.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: MessageSignatureType) = 4UL
+
+    override fun write(value: MessageSignatureType, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+/**
  * Why a PQC layer did not verify.
  */
 
@@ -2721,6 +2922,38 @@ public object FfiConverterOptionalByteArray: FfiConverterRustBuffer<kotlin.ByteA
         } else {
             buf.put(1)
             FfiConverterByteArray.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeMessagePqSignature: FfiConverterRustBuffer<MessagePqSignature?> {
+    override fun read(buf: ByteBuffer): MessagePqSignature? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeMessagePqSignature.read(buf)
+    }
+
+    override fun allocationSize(value: MessagePqSignature?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeMessagePqSignature.allocationSize(value)
+        }
+    }
+
+    override fun write(value: MessagePqSignature?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeMessagePqSignature.write(value, buf)
         }
     }
 }
@@ -3346,6 +3579,46 @@ public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.Str
     
 
         /**
+         * The bytes the ML-DSA-87 key signs for a message (spec/message-signing-v1.md):
+         * `"qorechain-msg-v1|" + chain_id + "|"` followed by `data`.
+         */
+    @Throws(QoreSignException::class) fun `messagePqSignBytes`(`chainId`: kotlin.String, `data`: kotlin.ByteArray): kotlin.ByteArray {
+            return FfiConverterByteArray.lift(
+    uniffiRustCallWithError(QoreSignException) { _status ->
+    UniffiLib.INSTANCE.uniffi_qoresign_ffi_fn_func_message_pq_sign_bytes(
+        FfiConverterString.lower(`chainId`),FfiConverterByteArray.lower(`data`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Parse the JSON form of a message signature; fails with `INVALID_ARGUMENT`.
+         */
+    @Throws(QoreSignException::class) fun `messageSignatureFromJson`(`json`: kotlin.String): MessageSignature {
+            return FfiConverterTypeMessageSignature.lift(
+    uniffiRustCallWithError(QoreSignException) { _status ->
+    UniffiLib.INSTANCE.uniffi_qoresign_ffi_fn_func_message_signature_from_json(
+        FfiConverterString.lower(`json`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * The JSON form of a message signature, as the other implementations exchange it.
+         */
+    @Throws(QoreSignException::class) fun `messageSignatureToJson`(`signature`: MessageSignature): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(QoreSignException) { _status ->
+    UniffiLib.INSTANCE.uniffi_qoresign_ffi_fn_func_message_signature_to_json(
+        FfiConverterTypeMessageSignature.lower(`signature`),_status)
+}
+    )
+    }
+    
+
+        /**
          * Parse a `qor1...` or `0x...` address.
          */
     @Throws(QoreSignException::class) fun `parseAddress`(`address`: kotlin.String): AccountAddress {
@@ -3406,6 +3679,20 @@ public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.Str
     uniffiRustCallWithError(QoreSignException) { _status ->
     UniffiLib.INSTANCE.uniffi_qoresign_ffi_fn_func_sign_hybrid(
         FfiConverterString.lower(`chainId`),FfiConverterULong.lower(`accountNumber`),FfiConverterByteArray.lower(`bodyBytes`),FfiConverterByteArray.lower(`authInfoBytes`),FfiConverterTypeClassicalKey.lower(`classicalKey`),FfiConverterOptionalTypePqKeyPair.lower(`pqKey`),FfiConverterOptionalTypeSigningMode.lower(`mode`),FfiConverterOptionalTypeSignOptions.lower(`options`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Sign arbitrary data with the keys of `signer` (a `qor1` account). Without
+         * `pq_key` the result is classical-only.
+         */
+    @Throws(QoreSignException::class) fun `signMessage`(`chainId`: kotlin.String, `signer`: kotlin.String, `data`: kotlin.ByteArray, `classicalKey`: ClassicalKey, `pqKey`: PqKeyPair? = null, `hedged`: kotlin.Boolean = false): MessageSignature {
+            return FfiConverterTypeMessageSignature.lift(
+    uniffiRustCallWithError(QoreSignException) { _status ->
+    UniffiLib.INSTANCE.uniffi_qoresign_ffi_fn_func_sign_message(
+        FfiConverterString.lower(`chainId`),FfiConverterString.lower(`signer`),FfiConverterByteArray.lower(`data`),FfiConverterTypeClassicalKey.lower(`classicalKey`),FfiConverterOptionalTypePqKeyPair.lower(`pqKey`),FfiConverterBoolean.lower(`hedged`),_status)
 }
     )
     }
@@ -3498,6 +3785,20 @@ public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.Str
 }
     )
     }
+    
+
+        /**
+         * Verify a message signature. `pq_public_key` is the ML-DSA-87 key
+         * registered on chain for `signer`. A classical-only signature is refused
+         * unless `require_pq` is false.
+         */
+    @Throws(QoreSignException::class) fun `verifyMessage`(`chainId`: kotlin.String, `signer`: kotlin.String, `data`: kotlin.ByteArray, `signature`: MessageSignature, `pqPublicKey`: kotlin.ByteArray? = null, `requirePq`: kotlin.Boolean = true)
+        = 
+    uniffiRustCallWithError(QoreSignException) { _status ->
+    UniffiLib.INSTANCE.uniffi_qoresign_ffi_fn_func_verify_message(
+        FfiConverterString.lower(`chainId`),FfiConverterString.lower(`signer`),FfiConverterByteArray.lower(`data`),FfiConverterTypeMessageSignature.lower(`signature`),FfiConverterOptionalByteArray.lower(`pqPublicKey`),FfiConverterBoolean.lower(`requirePq`),_status)
+}
+    
     
 
         /**

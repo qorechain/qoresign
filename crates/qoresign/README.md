@@ -11,7 +11,8 @@ It covers:
   QoreChain wallets use, and the draft hardened-only HD derivation;
 - hybrid transaction signing and local verification (v2 and v1 sign-bytes);
 - ML-DSA-87 key registration (`MsgRegisterPQCKeyV2` with proof of possession);
-- SIWQ messages: create, parse, sign, verify.
+- SIWQ messages: create, parse, sign, verify;
+- message signing (`signArbitrary` style): ADR-36 plus ML-DSA-87.
 
 ## Lanes
 
@@ -50,10 +51,23 @@ let check = VerifyHybridTxArgs::new(&signed.tx_bytes, "qorechain-vladi", 7, &cla
 assert!(verify_hybrid_tx(&check)?.valid);
 ```
 
+### Sign a message
+
+```rust
+use qoresign::{sign_message, verify_message, VerifyMessageArgs};
+
+let data = b"Approve export of report 2026-10";
+let sig = sign_message("qorechain-vladi", &account.bech32, data, &classical, Some(&pq), false)?;
+// MessageSignature is serde Serialize/Deserialize in the JSON shape every implementation exchanges.
+
+// pq.public_key stands for the key registered on chain for the signer.
+verify_message(&VerifyMessageArgs::new("qorechain-vladi", &account.bech32, data, &sig, Some(&pq.public_key)))?;
+```
+
 ## More
 
 - Guides: [../../docs](../../docs)
-- Specifications (hybrid signing, SIWQ, HD derivation draft): [../../spec](../../spec)
+- Specifications (hybrid signing, SIWQ, message signing, HD derivation draft): [../../spec](../../spec)
 
 ## License
 

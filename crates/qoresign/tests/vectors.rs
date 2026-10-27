@@ -288,3 +288,49 @@ fn siwq() {
     let verified = verify_siwq(&args).unwrap();
     assert_eq!(verified, parsed);
 }
+
+#[test]
+fn message() {
+    let c = ctx();
+    let m = &c.v["message"];
+    assert_eq!(s(m, "signer"), c.address);
+    let cases = m["cases"].as_array().unwrap();
+    assert_eq!(cases.len(), 2);
+    for case in cases {
+        let data = h(case, "data");
+        if let Some(text) = case["text"].as_str() {
+            assert_eq!(text.as_bytes(), data.as_slice());
+        }
+        assert_eq!(
+            hex::encode(adr36_sign_bytes(&c.address, &data)),
+            s(case, "adr36SignBytes")
+        );
+        assert_eq!(
+            hex::encode(message_pq_sign_bytes(&c.chain_id, &data).unwrap()),
+            s(case, "pqSignBytes")
+        );
+
+        let sig = sign_message(
+            &c.chain_id,
+            &c.address,
+            &data,
+            &c.classical,
+            Some(&c.pq),
+            false,
+        )
+        .unwrap();
+        assert_eq!(serde_json::to_value(&sig).unwrap(), case["signature"]);
+        let from_vector: MessageSignature =
+            serde_json::from_value(case["signature"].clone()).unwrap();
+        assert_eq!(from_vector, sig);
+
+        let args = VerifyMessageArgs::new(
+            &c.chain_id,
+            &c.address,
+            &data,
+            &from_vector,
+            Some(&c.pq.public_key),
+        );
+        verify_message(&args).unwrap();
+    }
+}

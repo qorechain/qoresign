@@ -303,6 +303,30 @@ func (c *Client) VerifySiwqWithChain(ctx context.Context, address string, opts q
 	return SiwqChainResult{SiwqFields: fields, PossessionProven: status.PossessionProven}, nil
 }
 
+// MessageChainResult is a message signature verified against the chain.
+type MessageChainResult struct {
+	PossessionProven bool
+}
+
+// VerifyMessageWithChain is qoresign.VerifyMessage against the ML-DSA-87 key
+// opts.Signer has registered on chain (opts.PqPublicKey is ignored).
+func (c *Client) VerifyMessageWithChain(ctx context.Context, opts qoresign.VerifyMessageOptions) (MessageChainResult, error) {
+	status, err := c.FetchPqKeyStatus(ctx, opts.Signer)
+	if err != nil {
+		return MessageChainResult{}, err
+	}
+	requirePq := opts.RequirePq == nil || *opts.RequirePq
+	if requirePq && !status.Registered {
+		return MessageChainResult{}, qoresign.NewError(qoresign.CodeKeyNotRegistered,
+			opts.Signer+" has no ML-DSA-87 key on the network", nil)
+	}
+	opts.PqPublicKey = status.PublicKey
+	if err := qoresign.VerifyMessage(opts); err != nil {
+		return MessageChainResult{}, err
+	}
+	return MessageChainResult{PossessionProven: status.PossessionProven}, nil
+}
+
 // ChainRefusal is a refusal reported by the network.
 type ChainRefusal struct {
 	Code      uint32

@@ -410,6 +410,47 @@ func TestChecksAgainstRegisteredKey(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+
+	t.Run("verifies a message signature against the chain", func(t *testing.T) {
+		data := []byte("Approve export of report 2026-10")
+		signature := must(qoresign.SignMessage(qoresign.SignMessageArgs{
+			ChainID: "qorechain-diana", Signer: address, Data: data, ClassicalKey: classical, PqKey: &pqKey,
+		}))
+		opts := qoresign.VerifyMessageOptions{ChainID: "qorechain-diana", Signer: address, Data: data, Signature: signature}
+		c, calls := server(t, accountRoute)
+		out := must(c.VerifyMessageWithChain(ctx, opts))
+		if !out.PossessionProven {
+			t.Fatalf("%+v", out)
+		}
+		if len(*calls) != 1 || !strings.HasSuffix((*calls)[0], "/qorechain/pqc/v1/account/"+address) {
+			t.Fatal(*calls)
+		}
+		wrongChain := opts
+		wrongChain.ChainID = "qorechain-vladi"
+		if _, err := c.VerifyMessageWithChain(ctx, wrongChain); code(err) != qoresign.CodePqSignatureInvalid {
+			t.Fatal(err)
+		}
+		other := must(qoresign.DeriveClassicalKey(testMnemonic, qoresign.DeriveClassicalOptions{Index: 1}))
+		otherAddr := must(qoresign.AddressFromPublicKey(other.PublicKey, qoresign.Secp256k1)).Bech32
+		wrongSigner := opts
+		wrongSigner.Signer = otherAddr
+		if _, err := c.VerifyMessageWithChain(ctx, wrongSigner); code(err) != qoresign.CodeAddressMismatch {
+			t.Fatal(err)
+		}
+		none, _ := server(t, func(*http.Request, string) reply { return reply{200, map[string]any{"found": false}} })
+		if _, err := none.VerifyMessageWithChain(ctx, opts); code(err) != qoresign.CodeKeyNotRegistered {
+			t.Fatal(err)
+		}
+		classicalOnly := must(qoresign.SignMessage(qoresign.SignMessageArgs{
+			ChainID: "qorechain-diana", Signer: address, Data: data, ClassicalKey: classical,
+		}))
+		optional := false
+		if _, err := none.VerifyMessageWithChain(ctx, qoresign.VerifyMessageOptions{
+			ChainID: "qorechain-diana", Signer: address, Data: data, Signature: classicalOnly, RequirePq: &optional,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	})
 }
 
 func TestCommittedExtensions(t *testing.T) {

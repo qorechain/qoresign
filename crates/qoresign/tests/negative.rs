@@ -791,3 +791,226 @@ fn error_codes() {
     assert_eq!(Error::SimulationFailed("m".into()).message(), "m");
     assert_eq!(Error::InvalidArgument("m".into()).to_string(), "m");
 }
+
+// Message signing
+
+const MESSAGE_SIGNER: &str = "qor19rl4cm2hmr8afy4kldpxz3fka4jguq0agt672h";
+
+fn message_verify<'a>(
+    data: &'a [u8],
+    sig: &'a MessageSignature,
+    pq: Option<&'a [u8]>,
+    edit: impl FnOnce(&mut VerifyMessageArgs<'a>),
+) -> Result<()> {
+    let mut args = VerifyMessageArgs::new(CHAIN_ID, MESSAGE_SIGNER, data, sig, pq);
+    edit(&mut args);
+    verify_message(&args)
+}
+
+#[test]
+fn message_checks() {
+    let k = keys();
+    let data = b"Approve export of report 2026-10";
+    let sig = sign_message(CHAIN_ID, &k.address, data, &k.classical, Some(&k.pq), false).unwrap();
+    let pq = Some(k.pq.public_key.as_slice());
+    assert_eq!(k.address, MESSAGE_SIGNER);
+    assert!(message_verify(data, &sig, pq, |_| {}).is_ok());
+    let code = |r: Result<()>| r.unwrap_err().code();
+
+    // Domain and chain id.
+    assert!(RESERVED_PQ_DOMAINS.contains(&MESSAGE_PQ_DOMAIN));
+    assert!(RESERVED_PQ_DOMAINS.contains(&SIWQ_PQ_DOMAIN));
+    assert_eq!(
+        message_pq_sign_bytes(CHAIN_ID, b"").unwrap(),
+        b"qorechain-msg-v1|qorechain-diana|"
+    );
+    for bad in [
+        "",
+        "qorechain diana",
+        "qorechain|diana",
+        "qorechain-diana\n",
+        "q\u{e9}",
+    ] {
+        assert_eq!(
+            message_pq_sign_bytes(bad, data).unwrap_err().code(),
+            "INVALID_ARGUMENT",
+            "{bad:?}"
+        );
+        assert_eq!(
+            sign_message(bad, &k.address, data, &k.classical, Some(&k.pq), false)
+                .unwrap_err()
+                .code(),
+            "INVALID_ARGUMENT"
+        );
+        assert_eq!(
+            code(message_verify(data, &sig, pq, |a| a.chain_id = bad)),
+            "INVALID_ARGUMENT"
+        );
+    }
+    assert_eq!(
+        code(message_verify(data, &sig, pq, |a| a.chain_id = "qorechain-vladi")),
+        "PQ_SIGNATURE_INVALID"
+    );
+
+    // PQ requirement.
+    assert_eq!(
+        code(message_verify(data, &sig, None, |_| {})),
+        "KEY_NOT_REGISTERED"
+    );
+    let classical_only =
+        sign_message(CHAIN_ID, &k.address, data, &k.classical, None, false).unwrap();
+    assert_eq!(
+        classical_only.signature_type,
+        MessageSignatureType::Secp256k1
+    );
+    assert!(classical_only.pq.is_none());
+    assert_eq!(
+        code(message_verify(data, &classical_only, pq, |_| {})),
+        "PQ_LAYER_MISSING"
+    );
+    assert!(message_verify(data, &classical_only, None, |a| a.require_pq = false).is_ok());
+    // A classical-only signature still needs a valid classical part.
+    assert_eq!(
+        code(message_verify(b"other", &classical_only, None, |a| a
+            .require_pq =
+            false)),
+        "CLASSICAL_SIGNATURE_INVALID"
+    );
+
+    // Wrong PQ key and tampered signatures.
+    let other = derive_hd_pq_key(MNEMONIC, &default_hd_path(0, 118), "").unwrap();
+    assert_eq!(
+        code(message_verify(data, &sig, Some(&other.public_key), |_| {})),
+        "PQ_SIGNATURE_INVALID"
+    );
+    let mut bad = sig.clone();
+    bad.pq.as_mut().unwrap().signature = "!!".into();
+    assert_eq!(
+        code(message_verify(data, &bad, pq, |_| {})),
+        "PQ_SIGNATURE_INVALID"
+    );
+    let mut bad = sig.clone();
+    bad.pq.as_mut().unwrap().algorithm_id = 2;
+    assert_eq!(
+        code(message_verify(data, &bad, pq, |_| {})),
+        "UNSUPPORTED_ALGORITHM"
+    );
+    let mut bad = sig.clone();
+    bad.classical.public_key = "!!".into();
+    assert_eq!(
+        code(message_verify(data, &bad, pq, |_| {})),
+        "CLASSICAL_SIGNATURE_INVALID"
+    );
+    let mut bad = sig.clone();
+    let other_sig = classical_sign(
+        ClassicalKeyType::Secp256k1,
+        &k.classical.private_key,
+        b"other",
+    )
+    .unwrap();
+    bad.classical.signature = base64::engine::general_purpose::STANDARD.encode(other_sig);
+    assert_eq!(
+        code(message_verify(data, &bad, pq, |_| {})),
+        "CLASSICAL_SIGNATURE_INVALID"
+    );
+
+    // A signature over different data.
+    assert_eq!(
+        code(message_verify(
+            b"Approve export of report 2026-11",
+            &sig,
+            pq,
+            |_| {}
+        )),
+        "CLASSICAL_SIGNATURE_INVALID"
+    );
+
+    // Hedged signatures verify.
+    let hedged = sign_message(CHAIN_ID, &k.address, data, &k.classical, Some(&k.pq), true).unwrap();
+    assert!(message_verify(data, &hedged, pq, |_| {}).is_ok());
+
+    // A SIWQ-domain signature over the same bytes is not a message signature.
+    let mut cross = sig.clone();
+    cross.pq.as_mut().unwrap().signature = base64::engine::general_purpose::STANDARD
+        .encode(pq_sign(&k.pq.secret_key, &siwq_pq_sign_bytes("x"), false).unwrap());
+    assert_eq!(
+        code(message_verify(data, &cross, pq, |_| {})),
+        "PQ_SIGNATURE_INVALID"
+    );
+}
+
+#[test]
+fn message_address_mismatch() {
+    let k = keys();
+    let data = b"hello";
+    let eth = derive_classical_key(MNEMONIC, ClassicalKeyType::EthSecp256k1, 0).unwrap();
+    assert_eq!(
+        sign_message(CHAIN_ID, &k.address, data, &eth, Some(&k.pq), false)
+            .unwrap_err()
+            .code(),
+        "ADDRESS_MISMATCH"
+    );
+    assert_eq!(
+        sign_message(CHAIN_ID, "qor1nope", data, &k.classical, None, false)
+            .unwrap_err()
+            .code(),
+        "INVALID_ADDRESS"
+    );
+
+    // A valid signature by another account's key.
+    let eth_addr = address_from_public_key(&eth.public_key, ClassicalKeyType::EthSecp256k1)
+        .unwrap()
+        .bech32;
+    let eth_sig = sign_message(CHAIN_ID, &eth_addr, data, &eth, None, false).unwrap();
+    let mut swapped =
+        sign_message(CHAIN_ID, &k.address, data, &k.classical, Some(&k.pq), false).unwrap();
+    swapped.classical = eth_sig.classical.clone();
+    let pq = Some(k.pq.public_key.as_slice());
+    assert_eq!(
+        message_verify(data, &swapped, pq, |_| {})
+            .unwrap_err()
+            .code(),
+        "ADDRESS_MISMATCH"
+    );
+
+    // Right key, wrong declared key type.
+    let mut wrong_type =
+        sign_message(CHAIN_ID, &k.address, data, &k.classical, Some(&k.pq), false).unwrap();
+    wrong_type.classical.key_type = ClassicalKeyType::EthSecp256k1;
+    assert_eq!(
+        message_verify(data, &wrong_type, pq, |_| {})
+            .unwrap_err()
+            .code(),
+        "ADDRESS_MISMATCH"
+    );
+
+    // Verified against another signer.
+    let sig = sign_message(CHAIN_ID, &k.address, data, &k.classical, Some(&k.pq), false).unwrap();
+    assert_eq!(
+        message_verify(data, &sig, pq, |a| a.signer = &eth_addr)
+            .unwrap_err()
+            .code(),
+        "ADDRESS_MISMATCH"
+    );
+
+    // eth_secp256k1 accounts verify (keccak digest), also from the 0x form.
+    let eth_pq = derive_canonical_pq_key(MNEMONIC, &eth_addr).unwrap();
+    let eth_hex = parse_address(&eth_addr).unwrap().hex;
+    let eth_sig = sign_message(CHAIN_ID, &eth_hex, data, &eth, Some(&eth_pq), false).unwrap();
+    let args = VerifyMessageArgs::new(
+        CHAIN_ID,
+        &eth_addr,
+        data,
+        &eth_sig,
+        Some(&eth_pq.public_key),
+    );
+    assert!(verify_message(&args).is_ok());
+
+    // JSON round trip keeps the shared shape.
+    let json = serde_json::to_string(&eth_sig).unwrap();
+    assert!(json.starts_with(
+        "{\"signatureType\":\"ml-dsa-87-hybrid\",\"classical\":{\"keyType\":\"eth_secp256k1\""
+    ));
+    let back: MessageSignature = serde_json::from_str(&json).unwrap();
+    assert_eq!(back, eth_sig);
+}

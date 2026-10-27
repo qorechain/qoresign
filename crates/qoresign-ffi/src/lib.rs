@@ -847,6 +847,145 @@ pub fn siwq_signature_from_json(json: String) -> Result<SiwqSignature> {
     Ok(core_sig.into())
 }
 
+// ---------------------------------------------------------------- message signing
+
+/// `MlDsa87Hybrid` (`ml-dsa-87-hybrid`) for both parts; `Secp256k1` for a classical-only signature.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, uniffi::Enum)]
+pub enum MessageSignatureType {
+    MlDsa87Hybrid,
+    Secp256k1,
+}
+
+/// Classical part of a [`MessageSignature`].
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct MessageClassicalSignature {
+    pub key_type: ClassicalKeyType,
+    /// Base64 compressed public key.
+    pub public_key: String,
+    /// Base64 64-byte signature over the ADR-36 sign document of the message.
+    pub signature: String,
+}
+
+/// ML-DSA-87 part of a [`MessageSignature`].
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct MessagePqSignature {
+    pub algorithm_id: u32,
+    /// Base64 ML-DSA-87 signature over [`message_pq_sign_bytes`].
+    pub signature: String,
+}
+
+/// A message signature; [`message_signature_to_json`] gives the JSON shape
+/// shared by every implementation.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct MessageSignature {
+    pub signature_type: MessageSignatureType,
+    pub classical: MessageClassicalSignature,
+    #[uniffi(default = None)]
+    pub pq: Option<MessagePqSignature>,
+}
+
+impl From<core::MessageSignature> for MessageSignature {
+    fn from(s: core::MessageSignature) -> Self {
+        MessageSignature {
+            signature_type: match s.signature_type {
+                core::MessageSignatureType::MlDsa87Hybrid => MessageSignatureType::MlDsa87Hybrid,
+                core::MessageSignatureType::Secp256k1 => MessageSignatureType::Secp256k1,
+            },
+            classical: MessageClassicalSignature {
+                key_type: s.classical.key_type.into(),
+                public_key: s.classical.public_key,
+                signature: s.classical.signature,
+            },
+            pq: s.pq.map(|p| MessagePqSignature {
+                algorithm_id: p.algorithm_id,
+                signature: p.signature,
+            }),
+        }
+    }
+}
+
+impl From<MessageSignature> for core::MessageSignature {
+    fn from(s: MessageSignature) -> Self {
+        core::MessageSignature {
+            signature_type: match s.signature_type {
+                MessageSignatureType::MlDsa87Hybrid => core::MessageSignatureType::MlDsa87Hybrid,
+                MessageSignatureType::Secp256k1 => core::MessageSignatureType::Secp256k1,
+            },
+            classical: core::MessageClassicalSignature {
+                key_type: s.classical.key_type.into(),
+                public_key: s.classical.public_key,
+                signature: s.classical.signature,
+            },
+            pq: s.pq.map(|p| core::MessagePqSignature {
+                algorithm_id: p.algorithm_id,
+                signature: p.signature,
+            }),
+        }
+    }
+}
+
+/// The bytes the ML-DSA-87 key signs for a message (spec/message-signing-v1.md):
+/// `"qorechain-msg-v1|" + chain_id + "|"` followed by `data`.
+#[uniffi::export]
+pub fn message_pq_sign_bytes(chain_id: String, data: Vec<u8>) -> Result<Vec<u8>> {
+    Ok(core::message_pq_sign_bytes(&chain_id, &data)?)
+}
+
+/// Sign arbitrary data with the keys of `signer` (a `qor1` account). Without
+/// `pq_key` the result is classical-only.
+#[uniffi::export(default(pq_key = None, hedged = false))]
+pub fn sign_message(
+    chain_id: String,
+    signer: String,
+    data: Vec<u8>,
+    classical_key: ClassicalKey,
+    pq_key: Option<PqKeyPair>,
+    hedged: bool,
+) -> Result<MessageSignature> {
+    let classical = classical_key.to_core()?;
+    let pq: Option<core::PqKeyPair> = pq_key.map(Into::into);
+    Ok(core::sign_message(&chain_id, &signer, &data, &classical, pq.as_ref(), hedged)?.into())
+}
+
+/// Verify a message signature. `pq_public_key` is the ML-DSA-87 key
+/// registered on chain for `signer`. A classical-only signature is refused
+/// unless `require_pq` is false.
+#[uniffi::export(default(pq_public_key = None, require_pq = true))]
+pub fn verify_message(
+    chain_id: String,
+    signer: String,
+    data: Vec<u8>,
+    signature: MessageSignature,
+    pq_public_key: Option<Vec<u8>>,
+    require_pq: bool,
+) -> Result<()> {
+    let signature: core::MessageSignature = signature.into();
+    let args = core::VerifyMessageArgs {
+        chain_id: &chain_id,
+        signer: &signer,
+        data: &data,
+        signature: &signature,
+        pq_public_key: pq_public_key.as_deref(),
+        require_pq,
+    };
+    Ok(core::verify_message(&args)?)
+}
+
+/// The JSON form of a message signature, as the other implementations exchange it.
+#[uniffi::export]
+pub fn message_signature_to_json(signature: MessageSignature) -> Result<String> {
+    let core_sig: core::MessageSignature = signature.into();
+    serde_json::to_string(&core_sig).map_err(|e| invalid_argument(&e.to_string()))
+}
+
+/// Parse the JSON form of a message signature; fails with `INVALID_ARGUMENT`.
+#[uniffi::export]
+pub fn message_signature_from_json(json: String) -> Result<MessageSignature> {
+    let core_sig: core::MessageSignature = serde_json::from_str(&json)
+        .map_err(|e| invalid_argument(&format!("invalid message signature JSON: {e}")))?;
+    Ok(core_sig.into())
+}
+
 // ---------------------------------------------------------------- lanes
 
 /// QoreChain's execution lanes.

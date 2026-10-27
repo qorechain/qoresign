@@ -45,6 +45,7 @@
 pub mod errors;
 pub mod keys;
 pub mod lanes;
+pub mod message;
 pub mod proto;
 pub mod registration;
 pub mod sign;
@@ -64,6 +65,11 @@ pub use keys::{
 pub use lanes::{
     assert_hybrid_lane, decide_lane, evaluate_layer_state, Lane, LaneDecision, LaneReason,
     LaneRequest, LaneSupport, LayerState, LayerStateInput, LANE_SUPPORT,
+};
+pub use message::{
+    message_pq_sign_bytes, sign_message, verify_message, MessageClassicalSignature,
+    MessagePqSignature, MessageSignature, MessageSignatureType, VerifyMessageArgs,
+    MESSAGE_PQ_DOMAIN, RESERVED_PQ_DOMAINS,
 };
 pub use proto::{
     append_extension, decode_any, decode_tx_raw, encode_any, encode_sign_doc, encode_tx_raw,

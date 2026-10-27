@@ -1175,6 +1175,260 @@ public func FfiConverterTypeLayerStateInput_lower(_ value: LayerStateInput) -> R
 
 
 /**
+ * Classical part of a [`MessageSignature`].
+ */
+public struct MessageClassicalSignature {
+    public let keyType: ClassicalKeyType
+    /**
+     * Base64 compressed public key.
+     */
+    public let publicKey: String
+    /**
+     * Base64 64-byte signature over the ADR-36 sign document of the message.
+     */
+    public let signature: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(keyType: ClassicalKeyType, 
+        /**
+         * Base64 compressed public key.
+         */publicKey: String, 
+        /**
+         * Base64 64-byte signature over the ADR-36 sign document of the message.
+         */signature: String) {
+        self.keyType = keyType
+        self.publicKey = publicKey
+        self.signature = signature
+    }
+}
+
+#if compiler(>=6)
+extension MessageClassicalSignature: Sendable {}
+#endif
+
+
+extension MessageClassicalSignature: Equatable, Hashable {
+    public static func ==(lhs: MessageClassicalSignature, rhs: MessageClassicalSignature) -> Bool {
+        if lhs.keyType != rhs.keyType {
+            return false
+        }
+        if lhs.publicKey != rhs.publicKey {
+            return false
+        }
+        if lhs.signature != rhs.signature {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(keyType)
+        hasher.combine(publicKey)
+        hasher.combine(signature)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeMessageClassicalSignature: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MessageClassicalSignature {
+        return
+            try MessageClassicalSignature(
+                keyType: FfiConverterTypeClassicalKeyType.read(from: &buf), 
+                publicKey: FfiConverterString.read(from: &buf), 
+                signature: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: MessageClassicalSignature, into buf: inout [UInt8]) {
+        FfiConverterTypeClassicalKeyType.write(value.keyType, into: &buf)
+        FfiConverterString.write(value.publicKey, into: &buf)
+        FfiConverterString.write(value.signature, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMessageClassicalSignature_lift(_ buf: RustBuffer) throws -> MessageClassicalSignature {
+    return try FfiConverterTypeMessageClassicalSignature.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMessageClassicalSignature_lower(_ value: MessageClassicalSignature) -> RustBuffer {
+    return FfiConverterTypeMessageClassicalSignature.lower(value)
+}
+
+
+/**
+ * ML-DSA-87 part of a [`MessageSignature`].
+ */
+public struct MessagePqSignature {
+    public let algorithmId: UInt32
+    /**
+     * Base64 ML-DSA-87 signature over [`message_pq_sign_bytes`].
+     */
+    public let signature: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(algorithmId: UInt32, 
+        /**
+         * Base64 ML-DSA-87 signature over [`message_pq_sign_bytes`].
+         */signature: String) {
+        self.algorithmId = algorithmId
+        self.signature = signature
+    }
+}
+
+#if compiler(>=6)
+extension MessagePqSignature: Sendable {}
+#endif
+
+
+extension MessagePqSignature: Equatable, Hashable {
+    public static func ==(lhs: MessagePqSignature, rhs: MessagePqSignature) -> Bool {
+        if lhs.algorithmId != rhs.algorithmId {
+            return false
+        }
+        if lhs.signature != rhs.signature {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(algorithmId)
+        hasher.combine(signature)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeMessagePqSignature: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MessagePqSignature {
+        return
+            try MessagePqSignature(
+                algorithmId: FfiConverterUInt32.read(from: &buf), 
+                signature: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: MessagePqSignature, into buf: inout [UInt8]) {
+        FfiConverterUInt32.write(value.algorithmId, into: &buf)
+        FfiConverterString.write(value.signature, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMessagePqSignature_lift(_ buf: RustBuffer) throws -> MessagePqSignature {
+    return try FfiConverterTypeMessagePqSignature.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMessagePqSignature_lower(_ value: MessagePqSignature) -> RustBuffer {
+    return FfiConverterTypeMessagePqSignature.lower(value)
+}
+
+
+/**
+ * A message signature; [`message_signature_to_json`] gives the JSON shape
+ * shared by every implementation.
+ */
+public struct MessageSignature {
+    public let signatureType: MessageSignatureType
+    public let classical: MessageClassicalSignature
+    public let pq: MessagePqSignature?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(signatureType: MessageSignatureType, classical: MessageClassicalSignature, pq: MessagePqSignature? = nil) {
+        self.signatureType = signatureType
+        self.classical = classical
+        self.pq = pq
+    }
+}
+
+#if compiler(>=6)
+extension MessageSignature: Sendable {}
+#endif
+
+
+extension MessageSignature: Equatable, Hashable {
+    public static func ==(lhs: MessageSignature, rhs: MessageSignature) -> Bool {
+        if lhs.signatureType != rhs.signatureType {
+            return false
+        }
+        if lhs.classical != rhs.classical {
+            return false
+        }
+        if lhs.pq != rhs.pq {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(signatureType)
+        hasher.combine(classical)
+        hasher.combine(pq)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeMessageSignature: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MessageSignature {
+        return
+            try MessageSignature(
+                signatureType: FfiConverterTypeMessageSignatureType.read(from: &buf), 
+                classical: FfiConverterTypeMessageClassicalSignature.read(from: &buf), 
+                pq: FfiConverterOptionTypeMessagePqSignature.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: MessageSignature, into buf: inout [UInt8]) {
+        FfiConverterTypeMessageSignatureType.write(value.signatureType, into: &buf)
+        FfiConverterTypeMessageClassicalSignature.write(value.classical, into: &buf)
+        FfiConverterOptionTypeMessagePqSignature.write(value.pq, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMessageSignature_lift(_ buf: RustBuffer) throws -> MessageSignature {
+    return try FfiConverterTypeMessageSignature.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMessageSignature_lower(_ value: MessageSignature) -> RustBuffer {
+    return FfiConverterTypeMessageSignature.lower(value)
+}
+
+
+/**
  * An ML-DSA-87 key pair.
  */
 public struct PqKeyPair {
@@ -2491,6 +2745,79 @@ extension LayerState: Equatable, Hashable {}
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
+ * `MlDsa87Hybrid` (`ml-dsa-87-hybrid`) for both parts; `Secp256k1` for a classical-only signature.
+ */
+
+public enum MessageSignatureType {
+    
+    case mlDsa87Hybrid
+    case secp256k1
+}
+
+
+#if compiler(>=6)
+extension MessageSignatureType: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeMessageSignatureType: FfiConverterRustBuffer {
+    typealias SwiftType = MessageSignatureType
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MessageSignatureType {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .mlDsa87Hybrid
+        
+        case 2: return .secp256k1
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: MessageSignatureType, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .mlDsa87Hybrid:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .secp256k1:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMessageSignatureType_lift(_ buf: RustBuffer) throws -> MessageSignatureType {
+    return try FfiConverterTypeMessageSignatureType.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMessageSignatureType_lower(_ value: MessageSignatureType) -> RustBuffer {
+    return FfiConverterTypeMessageSignatureType.lower(value)
+}
+
+
+extension MessageSignatureType: Equatable, Hashable {}
+
+
+
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
  * Why a PQC layer did not verify.
  */
 
@@ -3052,6 +3379,30 @@ fileprivate struct FfiConverterOptionData: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeMessagePqSignature: FfiConverterRustBuffer {
+    typealias SwiftType = MessagePqSignature?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeMessagePqSignature.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeMessagePqSignature.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypePqKeyPair: FfiConverterRustBuffer {
     typealias SwiftType = PqKeyPair?
 
@@ -3550,6 +3901,38 @@ public func laneSupport(lane: Lane) -> LaneSupport  {
 })
 }
 /**
+ * The bytes the ML-DSA-87 key signs for a message (spec/message-signing-v1.md):
+ * `"qorechain-msg-v1|" + chain_id + "|"` followed by `data`.
+ */
+public func messagePqSignBytes(chainId: String, data: Data)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypeQoreSignError_lift) {
+    uniffi_qoresign_ffi_fn_func_message_pq_sign_bytes(
+        FfiConverterString.lower(chainId),
+        FfiConverterData.lower(data),$0
+    )
+})
+}
+/**
+ * Parse the JSON form of a message signature; fails with `INVALID_ARGUMENT`.
+ */
+public func messageSignatureFromJson(json: String)throws  -> MessageSignature  {
+    return try  FfiConverterTypeMessageSignature_lift(try rustCallWithError(FfiConverterTypeQoreSignError_lift) {
+    uniffi_qoresign_ffi_fn_func_message_signature_from_json(
+        FfiConverterString.lower(json),$0
+    )
+})
+}
+/**
+ * The JSON form of a message signature, as the other implementations exchange it.
+ */
+public func messageSignatureToJson(signature: MessageSignature)throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeQoreSignError_lift) {
+    uniffi_qoresign_ffi_fn_func_message_signature_to_json(
+        FfiConverterTypeMessageSignature_lower(signature),$0
+    )
+})
+}
+/**
  * Parse a `qor1...` or `0x...` address.
  */
 public func parseAddress(address: String)throws  -> AccountAddress  {
@@ -3606,6 +3989,22 @@ public func signHybrid(chainId: String, accountNumber: UInt64, bodyBytes: Data, 
         FfiConverterOptionTypePqKeyPair.lower(pqKey),
         FfiConverterOptionTypeSigningMode.lower(mode),
         FfiConverterOptionTypeSignOptions.lower(options),$0
+    )
+})
+}
+/**
+ * Sign arbitrary data with the keys of `signer` (a `qor1` account). Without
+ * `pq_key` the result is classical-only.
+ */
+public func signMessage(chainId: String, signer: String, data: Data, classicalKey: ClassicalKey, pqKey: PqKeyPair? = nil, hedged: Bool = false)throws  -> MessageSignature  {
+    return try  FfiConverterTypeMessageSignature_lift(try rustCallWithError(FfiConverterTypeQoreSignError_lift) {
+    uniffi_qoresign_ffi_fn_func_sign_message(
+        FfiConverterString.lower(chainId),
+        FfiConverterString.lower(signer),
+        FfiConverterData.lower(data),
+        FfiConverterTypeClassicalKey_lower(classicalKey),
+        FfiConverterOptionTypePqKeyPair.lower(pqKey),
+        FfiConverterBool.lower(hedged),$0
     )
 })
 }
@@ -3693,6 +4092,22 @@ public func verifyHybridTx(txBytes: Data, chainId: String, accountNumber: UInt64
         FfiConverterOptionTypeVerifyVersion.lower(version),$0
     )
 })
+}
+/**
+ * Verify a message signature. `pq_public_key` is the ML-DSA-87 key
+ * registered on chain for `signer`. A classical-only signature is refused
+ * unless `require_pq` is false.
+ */
+public func verifyMessage(chainId: String, signer: String, data: Data, signature: MessageSignature, pqPublicKey: Data? = nil, requirePq: Bool = true)throws   {try rustCallWithError(FfiConverterTypeQoreSignError_lift) {
+    uniffi_qoresign_ffi_fn_func_verify_message(
+        FfiConverterString.lower(chainId),
+        FfiConverterString.lower(signer),
+        FfiConverterData.lower(data),
+        FfiConverterTypeMessageSignature_lower(signature),
+        FfiConverterOptionData.lower(pqPublicKey),
+        FfiConverterBool.lower(requirePq),$0
+    )
+}
 }
 /**
  * Check the ML-DSA-87 layer of a body against the account's registered key.
@@ -3811,6 +4226,15 @@ private let initializationResult: InitializationResult = {
     if (uniffi_qoresign_ffi_checksum_func_lane_support() != 56640) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_qoresign_ffi_checksum_func_message_pq_sign_bytes() != 9363) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_qoresign_ffi_checksum_func_message_signature_from_json() != 20275) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_qoresign_ffi_checksum_func_message_signature_to_json() != 35014) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_qoresign_ffi_checksum_func_parse_address() != 8921) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -3824,6 +4248,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_qoresign_ffi_checksum_func_sign_hybrid() != 56890) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_qoresign_ffi_checksum_func_sign_message() != 41999) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_qoresign_ffi_checksum_func_sign_pq_layer() != 28444) {
@@ -3845,6 +4272,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_qoresign_ffi_checksum_func_verify_hybrid_tx() != 17065) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_qoresign_ffi_checksum_func_verify_message() != 8019) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_qoresign_ffi_checksum_func_verify_pq_layer() != 25685) {

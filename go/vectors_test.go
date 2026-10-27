@@ -66,6 +66,16 @@ type vectorFile struct {
 		TypeURL string `json:"typeUrl"`
 		Value   string `json:"value"`
 	} `json:"registerMessage"`
+	Message struct {
+		Signer string `json:"signer"`
+		Cases  []struct {
+			Data           string          `json:"data"`
+			Text           *string         `json:"text"`
+			Adr36SignBytes string          `json:"adr36SignBytes"`
+			PqSignBytes    string          `json:"pqSignBytes"`
+			Signature      json.RawMessage `json:"signature"`
+		} `json:"cases"`
+	} `json:"message"`
 	Siwq struct {
 		Fields         qoresign.SiwqFields `json:"fields"`
 		Message        string              `json:"message"`
@@ -257,6 +267,45 @@ func TestVectors(t *testing.T) {
 			t.Errorf("type url %s", msg.TypeURL)
 		}
 		eqHex(t, "register message", msg.Value, v.RegisterMessage.Value)
+	})
+
+	t.Run("message", func(t *testing.T) {
+		if v.Message.Signer != v.Accounts.Secp256k1.Address {
+			t.Fatalf("signer %s", v.Message.Signer)
+		}
+		if len(v.Message.Cases) != 2 {
+			t.Fatalf("%d message cases", len(v.Message.Cases))
+		}
+		for i, c := range v.Message.Cases {
+			data := mustHex(t, c.Data)
+			if c.Text != nil && *c.Text != string(data) {
+				t.Errorf("case %d: text does not match data", i)
+			}
+			eqHex(t, "adr36SignBytes", qoresign.Adr36SignBytes(v.Message.Signer, data), c.Adr36SignBytes)
+			eqHex(t, "pqSignBytes", must(qoresign.MessagePqSignBytes(v.ChainID, data)), c.PqSignBytes)
+
+			sig := must(qoresign.SignMessage(qoresign.SignMessageArgs{
+				ChainID: v.ChainID, Signer: v.Message.Signer, Data: data, ClassicalKey: classical, PqKey: &pq,
+			}))
+			gotJSON := must(json.Marshal(sig))
+			var compact bytes.Buffer
+			_ = json.Compact(&compact, c.Signature)
+			if compact.String() != string(gotJSON) {
+				t.Errorf("case %d: signature JSON mismatch:\n got  %.200s\n want %.200s", i, gotJSON, compact.String())
+			}
+			var vecSig qoresign.MessageSignature
+			if err := json.Unmarshal(c.Signature, &vecSig); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(vecSig, sig) {
+				t.Errorf("case %d: parsed vector signature differs", i)
+			}
+			if err := qoresign.VerifyMessage(qoresign.VerifyMessageOptions{
+				ChainID: v.ChainID, Signer: v.Message.Signer, Data: data, Signature: vecSig, PqPublicKey: pq.PublicKey,
+			}); err != nil {
+				t.Errorf("case %d: %v", i, err)
+			}
+		}
 	})
 
 	t.Run("siwq", func(t *testing.T) {
