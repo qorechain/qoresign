@@ -33,8 +33,12 @@ import (
     "github.com/qorechain/qoresign/go/network"
 )
 
-fields, err := network.VerifySiwqWithChain(ctx, network.Options{REST: "https://api.qore.host"}, address, message, signature,
-    qoresign.VerifySiwqOptions{Domain: "app.example.com", Nonce: nonce, ChainID: "qorechain-vladi"})
+client := network.NewClient("https://api.qore.host")
+result, err := client.VerifySiwqWithChain(ctx, address, qoresign.VerifySiwqOptions{
+    Message: message, Signature: signature,
+    Domain: "app.example.com", Nonce: nonce, ChainID: "qorechain-vladi",
+})
+// result.SiwqFields holds the verified fields; result.PossessionProven reports the key's proof of possession.
 ```
 
 ## Classical-only accounts
