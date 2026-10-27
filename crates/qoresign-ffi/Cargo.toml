@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: Apache-2.0
+[package]
+name = "qoresign-ffi"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["QoreChain Association"]
+repository = "https://github.com/qorechain/qoresign"
+description = "UniFFI bindings of QoreSign for the Swift and Kotlin packages."
+publish = false
+
+[lib]
+name = "qoresign_ffi"
+crate-type = ["cdylib", "staticlib", "lib"]
+
+[[bin]]
+# Bindings generator; run with `cargo run -p qoresign-ffi --features cli --bin uniffi-bindgen`.
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["cli"]
+
+[features]
+cli = ["uniffi/cli"]
+
+[dependencies]
+qorechain-qoresign = { path = "../qoresign" }
+uniffi = "=0.29.5"
+serde_json = "=1.0.154"
+thiserror = "=2.0.18"
+
+[dev-dependencies]
+hex = "=0.4.3"

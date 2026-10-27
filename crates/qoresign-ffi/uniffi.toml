@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+[bindings.swift]
+module_name = "QoreSign"
+ffi_module_name = "QoreSignFFI"
+ffi_module_filename = "QoreSignFFI"
+generate_immutable_records = true
+
+[bindings.kotlin]
+package_name = "io.github.qorechain.qoresign"
+cdylib_name = "qoresign_ffi"
+generate_immutable_records = true

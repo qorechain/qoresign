@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: Apache-2.0
+name: ci-swift
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal
+          rustup default 1.95.0
+          rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios aarch64-apple-darwin x86_64-apple-darwin
+      - name: Build the xcframework
+        run: scripts/build-xcframework.sh
+      - name: Generated Swift bindings are up to date
+        run: git diff --exit-code swift/Sources/QoreSign/QoreSign.swift
+      - name: swift test
+        run: QORESIGN_LOCAL_FFI=1 swift test

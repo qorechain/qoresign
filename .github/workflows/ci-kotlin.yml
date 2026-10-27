@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: Apache-2.0
+name: ci-kotlin
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  jvm:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal
+          rustup default 1.95.0
+      - name: Build the linux-x86-64 native library and the bindings
+        run: scripts/build-kotlin-natives.sh bindings linux-x86-64
+      - name: Generated Kotlin bindings are up to date
+        run: git diff --exit-code kotlin/src/main/kotlin
+      - name: gradle test
+        working-directory: kotlin
+        run: ./gradlew --no-daemon test publishToMavenLocal
+
+  android:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal
+          rustup default 1.95.0
+          rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+      - name: Android NDK 27
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.1.12297006" > /dev/null
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.1.12297006" >> "$GITHUB_ENV"
+      - name: Build the Android native libraries
+        run: scripts/build-kotlin-natives.sh android
+      - name: Build the AAR
+        working-directory: kotlin
+        run: ./gradlew --no-daemon -PqoresignAndroid=true :android:assembleRelease
