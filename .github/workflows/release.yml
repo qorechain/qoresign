@@ -1,0 +1,278 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Runs on a pushed tag v<version>. Builds the Swift xcframework zip, the JVM
+# native libraries for every JNA target and the Android AAR, attaches them to
+# the GitHub release, then publishes each registry whose secret is set.
+#
+# Swift: SwiftPM checks the zip against the checksum in the tagged
+# Package.swift. Run `scripts/build-xcframework.sh --write-checksum` on macOS,
+# commit, tag, and upload that zip (`gh release upload`). The release job
+# verifies an uploaded zip against Package.swift; when none is uploaded it
+# attaches the CI-built zip only if its checksum matches, and fails otherwise.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  RUST_VERSION: "1.95.0"
+
+jobs:
+  xcframework:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install "$RUST_VERSION" --profile minimal
+          rustup default "$RUST_VERSION"
+          rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios aarch64-apple-darwin x86_64-apple-darwin
+      - run: scripts/build-xcframework.sh
+      - run: QORESIGN_LOCAL_FFI=1 swift test
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: xcframework
+          path: |
+            swift/QoreSignFFI.xcframework.zip
+            swift/QoreSignFFI.xcframework.zip.sha256
+
+  jvm-natives:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            targets: linux-x86-64
+            rust_targets: x86_64-unknown-linux-gnu
+          - os: ubuntu-22.04-arm
+            targets: linux-aarch64
+            rust_targets: aarch64-unknown-linux-gnu
+          - os: macos-15
+            targets: darwin-aarch64 darwin-x86-64
+            rust_targets: aarch64-apple-darwin x86_64-apple-darwin
+          - os: windows-2022
+            targets: win32-x86-64
+            rust_targets: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install "$RUST_VERSION" --profile minimal
+          rustup default "$RUST_VERSION"
+          rustup target add ${{ matrix.rust_targets }}
+      - run: scripts/build-kotlin-natives.sh ${{ matrix.targets }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: natives-${{ matrix.os }}
+          path: kotlin/natives
+
+  android-natives:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install "$RUST_VERSION" --profile minimal
+          rustup default "$RUST_VERSION"
+          rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+      - name: Android NDK 27
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.1.12297006" > /dev/null
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.1.12297006" >> "$GITHUB_ENV"
+      - run: scripts/build-kotlin-natives.sh android
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-jnilibs
+          path: kotlin/android/src/main/jniLibs
+
+  kotlin-packages:
+    needs: [jvm-natives, android-natives]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: natives-*
+          path: kotlin/natives
+          merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: android-jnilibs
+          path: kotlin/android/src/main/jniLibs
+      - name: All natives present
+        run: |
+          for f in darwin-aarch64/libqoresign_ffi.dylib darwin-x86-64/libqoresign_ffi.dylib \
+                   linux-x86-64/libqoresign_ffi.so linux-aarch64/libqoresign_ffi.so \
+                   win32-x86-64/qoresign_ffi.dll; do
+            test -f "kotlin/natives/$f" || { echo "missing kotlin/natives/$f"; exit 1; }
+          done
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            test -f "kotlin/android/src/main/jniLibs/$abi/libqoresign_ffi.so" || { echo "missing $abi"; exit 1; }
+          done
+      - name: Test and package
+        working-directory: kotlin
+        run: ./gradlew --no-daemon -PqoresignAndroid=true test jar :android:assembleRelease
+      - name: Collect
+        run: |
+          mkdir -p dist
+          cp "kotlin/build/libs/qoresign-${GITHUB_REF_NAME#v}.jar" dist/
+          cp kotlin/android/build/outputs/aar/android-release.aar "dist/qoresign-android-${GITHUB_REF_NAME#v}.aar"
+          (cd kotlin && zip -r ../dist/qoresign-jvm-natives.zip natives)
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: kotlin-packages
+          path: dist
+
+  github-release:
+    needs: [xcframework, kotlin-packages]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: artifacts
+      - name: Package.swift matches the tag
+        run: |
+          version="$(sed -nE 's/^let releaseVersion = "([^"]+)".*/\1/p' Package.swift)"
+          test "v$version" = "$TAG" || { echo "Package.swift releaseVersion $version does not match $TAG"; exit 1; }
+      - name: Create the release if needed
+        run: gh release view "$TAG" > /dev/null 2>&1 || gh release create "$TAG" --verify-tag --title "$TAG" --notes "See CHANGELOG.md."
+      - name: Attach the Kotlin packages
+        run: gh release upload "$TAG" artifacts/kotlin-packages/* --clobber
+      - name: Attach or verify the xcframework zip
+        run: |
+          expected="$(sed -nE 's/^let releaseChecksum = "([0-9a-f]+)".*/\1/p' Package.swift)"
+          if gh release view "$TAG" --json assets --jq '.assets[].name' | grep -qx QoreSignFFI.xcframework.zip; then
+            gh release download "$TAG" --pattern QoreSignFFI.xcframework.zip --dir uploaded
+            actual="$(sha256sum uploaded/QoreSignFFI.xcframework.zip | cut -d' ' -f1)"
+            echo "uploaded zip: $actual, Package.swift: $expected"
+            test "$actual" = "$expected"
+          else
+            built="$(cut -d' ' -f1 artifacts/xcframework/QoreSignFFI.xcframework.zip.sha256)"
+            if [ "$built" = "$expected" ]; then
+              gh release upload "$TAG" artifacts/xcframework/QoreSignFFI.xcframework.zip
+            else
+              echo "CI-built zip checksum $built differs from Package.swift ($expected)."
+              echo "Upload the zip built with scripts/build-xcframework.sh --write-checksum:"
+              echo "  gh release upload $TAG swift/QoreSignFFI.xcframework.zip"
+              exit 1
+            fi
+          fi
+
+  publish-npm:
+    needs: [github-release]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.NPM_TOKEN != ''
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        if: env.NPM_TOKEN != ''
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: env.NPM_TOKEN != ''
+        with:
+          node-version: "22"
+          registry-url: https://registry.npmjs.org
+      - name: Publish to npm
+        if: env.NPM_TOKEN != ''
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm -r build
+          pnpm -r test
+          pnpm -r publish --access public --no-git-checks
+
+  publish-crates:
+    needs: [github-release]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.CARGO_REGISTRY_TOKEN != ''
+      - name: Publish to crates.io
+        if: env.CARGO_REGISTRY_TOKEN != ''
+        run: |
+          rustup toolchain install "$RUST_VERSION" --profile minimal
+          rustup default "$RUST_VERSION"
+          cargo test --locked -p qorechain-qoresign
+          cargo publish --locked -p qorechain-qoresign
+
+  publish-maven:
+    needs: [github-release]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    env:
+      ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+      ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+      ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.MAVEN_SIGNING_KEY }}
+      ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.MAVEN_SIGNING_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.ORG_GRADLE_PROJECT_mavenCentralPassword != '' && env.ORG_GRADLE_PROJECT_signingInMemoryKey != ''
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        if: env.ORG_GRADLE_PROJECT_mavenCentralPassword != '' && env.ORG_GRADLE_PROJECT_signingInMemoryKey != ''
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: env.ORG_GRADLE_PROJECT_mavenCentralPassword != '' && env.ORG_GRADLE_PROJECT_signingInMemoryKey != ''
+        with:
+          pattern: natives-*
+          path: kotlin/natives
+          merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: env.ORG_GRADLE_PROJECT_mavenCentralPassword != '' && env.ORG_GRADLE_PROJECT_signingInMemoryKey != ''
+        with:
+          name: android-jnilibs
+          path: kotlin/android/src/main/jniLibs
+      - name: Publish to Maven Central
+        if: env.ORG_GRADLE_PROJECT_mavenCentralPassword != '' && env.ORG_GRADLE_PROJECT_signingInMemoryKey != ''
+        working-directory: kotlin
+        run: ./gradlew --no-daemon -PqoresignAndroid=true publishToMavenCentral
+
+  publish-go:
+    needs: [github-release]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    env:
+      # Token allowed to push tags; the Go module in go/ is versioned by go/v<version> tags.
+      GO_RELEASE_TOKEN: ${{ secrets.GO_RELEASE_TOKEN }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.GO_RELEASE_TOKEN != ''
+        with:
+          token: ${{ secrets.GO_RELEASE_TOKEN }}
+      - name: Tag the Go module and request it from the Go proxy
+        if: env.GO_RELEASE_TOKEN != ''
+        run: |
+          if ! git ls-remote --exit-code --tags origin "refs/tags/go/$TAG" > /dev/null; then
+            git tag "go/$TAG" "$GITHUB_SHA"
+            git push origin "refs/tags/go/$TAG"
+          fi
+          curl -fsS "https://proxy.golang.org/github.com/qorechain/qoresign/go/@v/$TAG.info"
