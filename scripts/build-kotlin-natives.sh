@@ -25,6 +25,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# Keep build-machine paths out of the shipped binaries (panic locations and
+# debug info would otherwise embed the local checkout and cargo home).
+REMAP="--remap-path-prefix=$ROOT=/qoresign --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo --remap-path-prefix=${RUSTUP_HOME:-$HOME/.rustup}=/rustup"
+
 CRATE=qoresign-ffi
 TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
 JVM_OUT="$ROOT/kotlin/natives"
@@ -76,7 +80,7 @@ ndk_bin() {
 build_jvm() {
   local prefix="$1" rust="$2" lib="$3"
   echo "==> $prefix ($rust)"
-  cargo build --locked --release -p "$CRATE" --lib --target "$rust"
+  RUSTFLAGS="$REMAP" cargo build --locked --release -p "$CRATE" --lib --target "$rust"
   mkdir -p "$JVM_OUT/$prefix"
   cp "$TARGET_DIR/$rust/release/$lib" "$JVM_OUT/$prefix/$lib"
 }
@@ -92,7 +96,7 @@ build_android() {
   export "CARGO_TARGET_${env}_RUSTFLAGS=-C link-arg=-Wl,-z,max-page-size=16384"
   export "CC_${rust//-/_}=$bin/${clang}${ANDROID_API}-clang"
   export "AR_${rust//-/_}=$bin/llvm-ar"
-  cargo build --locked --release -p "$CRATE" --lib --target "$rust"
+  RUSTFLAGS="$REMAP -C link-arg=-Wl,-z,max-page-size=16384" cargo build --locked --release -p "$CRATE" --lib --target "$rust"
   mkdir -p "$ANDROID_OUT/$abi"
   cp "$TARGET_DIR/$rust/release/libqoresign_ffi.so" "$ANDROID_OUT/$abi/libqoresign_ffi.so"
 }

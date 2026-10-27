@@ -16,6 +16,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# Keep build-machine paths out of the shipped binaries (panic locations and
+# debug info would otherwise embed the local checkout and cargo home).
+REMAP="--remap-path-prefix=$ROOT=/qoresign --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo --remap-path-prefix=${RUSTUP_HOME:-$HOME/.rustup}=/rustup"
+
 WRITE_CHECKSUM=0
 for arg in "$@"; do
   case "$arg" in
@@ -47,7 +51,7 @@ TARGETS=(
 
 for t in "${TARGETS[@]}"; do
   echo "==> cargo build $t"
-  cargo build --locked --release -p "$CRATE" --lib --target "$t"
+  RUSTFLAGS="$REMAP" cargo build --locked --release -p "$CRATE" --lib --target "$t"
 done
 
 rm -rf "$WORK"
