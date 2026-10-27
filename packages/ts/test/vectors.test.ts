@@ -13,6 +13,9 @@ import {
   deriveHdPqKey,
   fromHex,
   hybridSignBytes,
+  messagePqSignBytes,
+  signMessage,
+  verifyMessage,
   proofOfPossessionMessage,
   signHybrid,
   signProofOfPossession,
@@ -71,6 +74,16 @@ describe("vectors/qoresign-v1.json", () => {
     const msg = buildRegisterPqKeyMessage({ chainId: v.chainId, account: pop.account, pqKey: pq, classicalPublicKey: classical.publicKey });
     expect(msg.typeUrl).toBe(v.registerMessage.typeUrl);
     expect(toHex(msg.value)).toBe(v.registerMessage.value);
+  });
+
+  it("message signing", () => {
+    for (const c of v.message.cases) {
+      const data = fromHex(c.data);
+      expect(toHex(adr36SignBytes(v.message.signer, data))).toBe(c.adr36SignBytes);
+      expect(toHex(messagePqSignBytes(v.chainId, data))).toBe(c.pqSignBytes);
+      expect(signMessage({ chainId: v.chainId, signer: v.message.signer, data, classicalKey: classical, pqKey: pq })).toEqual(c.signature);
+      verifyMessage({ chainId: v.chainId, signer: v.message.signer, data, signature: c.signature, pqPublicKey: pq.publicKey });
+    }
   });
 
   it("sign in", () => {

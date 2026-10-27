@@ -17,6 +17,7 @@ Networks: mainnet chain id qorechain-vladi (REST https://api.qore.host), testnet
 ## Specs
 - [Hybrid transaction signing v1](spec/hybrid-signing-v1.md): extension /qorechain.pqc.v1.PQCHybridSignature, sign-bytes v1/v2, order of operations, MsgRegisterPQCKeyV2 + proof of possession
 - [Sign In With QoreChain v1](spec/siwq-v1.md)
+- [Message signing v1](spec/message-signing-v1.md): ADR-36 + ML-DSA-87 over "qorechain-msg-v1|" + chainId + "|" + data; reserved signing domains
 - [ML-DSA-87 key derivation](spec/hd-derivation-draft.md): canonical SHAKE256 derivation (stable), hardened-only HD (draft)
 - [Test vectors](vectors/README.md)
 
@@ -25,8 +26,9 @@ Networks: mainnet chain id qorechain-vladi (REST https://api.qore.host), testnet
 - signHybrid, signPqLayer, hybridSignBytes, verifyHybridTx, verifyPqLayer
 - buildRegisterPqKeyMessage, signProofOfPossession, verifyProofOfPossession
 - createSiwqMessage, parseSiwqMessage, signSiwq, verifySiwq
+- signMessage, verifyMessage, messagePqSignBytes, RESERVED_PQ_DOMAINS
 - assertHybridLane, decideLane, evaluateLayerState
-- @qorechain/qoresign/network: fetchPqKeyStatus, resolveSignBytesVersion, simulateTx, broadcastTx, submitWithSignBytesFallback, assertPqLayerMatchesRegisteredKey, verifySiwqWithChain
+- @qorechain/qoresign/network: fetchPqKeyStatus, resolveSignBytesVersion, simulateTx, broadcastTx, submitWithSignBytesFallback, assertPqLayerMatchesRegisteredKey, verifySiwqWithChain, verifyMessageWithChain
 - Errors: QoreSignError with a stable `code` (e.g. PQ_SIGNATURE_INVALID, KEY_NOT_REGISTERED, LANE_NOT_AVAILABLE, SIMULATION_FAILED)
 
 ## Examples

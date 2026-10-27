@@ -13,6 +13,7 @@ First release, in TypeScript, Rust, Go, Swift and Kotlin.
 - Local verification of hybrid transactions and of a dApp-provided ML-DSA-87 layer.
 - Proof of possession and `MsgRegisterPQCKeyV2` construction.
 - Sign In With QoreChain: message format, signing and verification (ADR-36 secp256k1 plus ML-DSA-87).
+- Arbitrary message signing (`signMessage` / `verifyMessage`): ADR-36 plus ML-DSA-87 over `"qorechain-msg-v1|" + chainId + "|" + data`, and the list of reserved ML-DSA-87 signing domains.
 - Lane rules: native hybrid, EVM quantum-ready only, SVM unavailable.
 - Network helpers (TypeScript and Go): key status, sign-bytes version, simulation with balance changes and a gas limit suggestion, broadcast with a single sign-bytes fallback, sign-in verification against the key on chain.
 - Specifications and shared test vectors (`vectors/qoresign-v1.json`).

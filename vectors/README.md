@@ -12,6 +12,7 @@ Every key is derived from the public BIP-39 test mnemonic (`abandon ... about`).
 | `hybridTx` | a `TxBody` and `AuthInfo`, account number and chain id, with the expected sign-bytes, ML-DSA-87 signature, final body, secp256k1 signature and `TxRaw` for sign-bytes `v2` and `v1` (`spec/hybrid-signing-v1.md`) |
 | `proofOfPossession` | proof-of-possession message and signature |
 | `registerMessage` | encoded `MsgRegisterPQCKeyV2` |
+| `message` | arbitrary message signing: data, ADR-36 and ML-DSA-87 sign-bytes, signature (`spec/message-signing-v1.md`) |
 | `siwq` | sign-in fields, rendered message, ADR-36 and ML-DSA-87 sign-bytes, signature, and a time at which it verifies (`spec/siwq-v1.md`) |
 
 All byte strings are lowercase hex. ML-DSA-87 signatures are deterministic (FIPS 204, `rnd` = 32 zero bytes); secp256k1 signatures use RFC 6979 and low-S.

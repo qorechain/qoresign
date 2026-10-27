@@ -10,6 +10,7 @@
 - Specifications
   - [Hybrid transaction signing v1](../spec/hybrid-signing-v1.md)
   - [Sign In With QoreChain v1](../spec/siwq-v1.md)
+  - [Message signing v1](../spec/message-signing-v1.md)
   - [ML-DSA-87 key derivation](../spec/hd-derivation-draft.md)
 - [Test vectors](../vectors/README.md)
 - API reference: run `pnpm -C packages/ts docs` (TypeScript), `cargo doc -p qorechain-qoresign` (Rust), `go doc github.com/qorechain/qoresign/go` (Go). Swift and Kotlin bindings mirror the Rust API; see [swift/README.md](../swift/README.md) and [kotlin/README.md](../kotlin/README.md).

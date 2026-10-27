@@ -8,6 +8,7 @@ import { signBytesVersionForApplied, SIGN_BYTES_V2_UPGRADES } from "@qorechain/p
 import { fromBase64, toBase64 } from "./bytes.js";
 import { QoreSignError } from "./errors.js";
 import type { SignBytesVersion } from "./sign.js";
+import { verifyMessage, type MessageSignature } from "./message.js";
 import { verifySiwq, type SiwqFields, type VerifySiwqArgs } from "./siwq.js";
 import { verifyPqLayer, type PqLayerResult } from "./verify.js";
 
@@ -131,6 +132,24 @@ export async function verifySiwqWithChain(
     throw new QoreSignError("ADDRESS_MISMATCH", `the message is for ${fields.address}, not ${args.address}`);
   }
   return { ...fields, possessionProven: status.possessionProven === true };
+}
+
+/** {@link verifyMessage} against the ML-DSA-87 key the signer has registered on chain. */
+export async function verifyMessageWithChain(
+  opts: RestOptions & {
+    chainId: string;
+    signer: string;
+    data: Uint8Array | string;
+    signature: MessageSignature;
+    requirePq?: boolean;
+  },
+): Promise<{ possessionProven: boolean }> {
+  const status = await fetchPqKeyStatus({ rest: opts.rest, fetch: opts.fetch, address: opts.signer });
+  if ((opts.requirePq ?? true) && !status.registered) {
+    throw new QoreSignError("KEY_NOT_REGISTERED", `${opts.signer} has no ML-DSA-87 key on the network`);
+  }
+  verifyMessage({ ...opts, pqPublicKey: status.publicKey });
+  return { possessionProven: status.possessionProven === true };
 }
 
 /** A refusal reported by the network. */

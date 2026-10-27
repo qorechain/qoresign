@@ -55,7 +55,7 @@ Network helpers (key status, simulation with balance changes, broadcast, sign-in
 
 - [Quickstart](docs/quickstart.md)
 - Guides: [Keplr-compatible wallets](docs/guides/keplr-compatible-wallets.md), [Sign In With QoreChain](docs/guides/sign-in.md), [EVM quantum-ready mode](docs/guides/evm-quantum-ready.md), [key derivation](docs/guides/key-derivation.md), [sizes and transport](docs/guides/sizes-and-transport.md)
-- Specifications: [hybrid signing](spec/hybrid-signing-v1.md), [Sign In With QoreChain](spec/siwq-v1.md), [ML-DSA-87 key derivation](spec/hd-derivation-draft.md)
+- Specifications: [hybrid signing](spec/hybrid-signing-v1.md), [Sign In With QoreChain](spec/siwq-v1.md), [message signing](spec/message-signing-v1.md), [ML-DSA-87 key derivation](spec/hd-derivation-draft.md)
 - [Examples](examples)
 
 ## Scope

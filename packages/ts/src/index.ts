@@ -100,3 +100,11 @@ export {
   type AnyMessage,
   type TxRawParts,
 } from "./proto.js";
+export {
+  MESSAGE_PQ_DOMAIN,
+  RESERVED_PQ_DOMAINS,
+  messagePqSignBytes,
+  signMessage,
+  verifyMessage,
+  type MessageSignature,
+} from "./message.js";

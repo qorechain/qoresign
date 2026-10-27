@@ -93,6 +93,8 @@ const siwqFields = {
   resources: ["https://app.example.com/terms"],
 };
 const siwqMessage = qs.createSiwqMessage(siwqFields);
+const messageData = "Approve export of report 2026-10";
+const messageBinary = Uint8Array.from([0x00, 0x01, 0x02, 0xfe, 0xff]);
 const register = qs.buildRegisterPqKeyMessage({ chainId: CHAIN_ID, account: addr.bech32, pqKey: pq, classicalPublicKey: classical.publicKey });
 
 const hdPaths = ["m/44'/118'/0'/0'/0'", "m/44'/118'/1'/0'/0'", "m/44'/60'/0'/0'/0'"];
@@ -137,6 +139,24 @@ const vectors = {
     signature: hex(qs.signProofOfPossession({ chainId: CHAIN_ID, account: addr.bech32, pqKey: pq })),
   },
   registerMessage: { typeUrl: register.typeUrl, value: hex(register.value) },
+  message: {
+    signer: addr.bech32,
+    cases: [
+      {
+        data: hex(enc(messageData)),
+        text: messageData,
+        adr36SignBytes: hex(qs.adr36SignBytes(addr.bech32, enc(messageData))),
+        pqSignBytes: hex(qs.messagePqSignBytes(CHAIN_ID, messageData)),
+        signature: qs.signMessage({ chainId: CHAIN_ID, signer: addr.bech32, data: messageData, classicalKey: classical, pqKey: pq }),
+      },
+      {
+        data: hex(messageBinary),
+        adr36SignBytes: hex(qs.adr36SignBytes(addr.bech32, messageBinary)),
+        pqSignBytes: hex(qs.messagePqSignBytes(CHAIN_ID, messageBinary)),
+        signature: qs.signMessage({ chainId: CHAIN_ID, signer: addr.bech32, data: messageBinary, classicalKey: classical, pqKey: pq }),
+      },
+    ],
+  },
   siwq: {
     fields: siwqFields,
     message: siwqMessage,
