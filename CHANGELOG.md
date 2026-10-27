@@ -2,6 +2,12 @@
 
 All notable changes are listed here. Versions follow [Semantic Versioning](https://semver.org); before 1.0, a minor version may contain breaking changes, which are always called out.
 
+## [Unreleased]
+
+### Fixed
+
+- Python: the Linux wheels were built without their generated bindings (`import qoresign` failed with `cannot import name 'qoresign_ffi'`). The native library on Linux now keeps the symbols the bindings are generated from, and the build checks that every wheel carries them.
+
 ## [0.1.1] - 2026-10-27
 
 ### Added

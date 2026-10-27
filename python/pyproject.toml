@@ -44,7 +44,12 @@ manifest-path = "../crates/qoresign-ffi/Cargo.toml"
 module-name = "qoresign._ffi"
 python-source = "."
 locked = true
-strip = true
+# No `strip = true`: UniFFI reads the binding metadata of an ELF library from
+# its static symbol table, so a fully stripped Linux library gives an empty
+# qoresign._ffi package. Stripping is set per platform through
+# CARGO_PROFILE_RELEASE_STRIP by scripts/build-python-wheels.sh and the
+# release workflow (symbols on macOS and Windows, debuginfo plus
+# --discard-all on Linux).
 # LICENSE and NOTICE are copied from the repository root by
 # scripts/build-python-wheels.sh and the release workflow.
 include = [

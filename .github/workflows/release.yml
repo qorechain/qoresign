@@ -165,7 +165,12 @@ jobs:
     env:
       CARGO_PROFILE_RELEASE_LTO: "true"
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
-      CARGO_PROFILE_RELEASE_STRIP: symbols
+      # maturin generates the bindings from the built library. UniFFI reads an
+      # ELF library through its static symbol table, which strip=symbols
+      # removes (the wheel then has an empty qoresign._ffi), so Linux keeps
+      # the global symbols: debuginfo here plus --discard-all in RUSTFLAGS.
+      # macOS and Windows libraries are read through their export tables.
+      CARGO_PROFILE_RELEASE_STRIP: ${{ contains(matrix.target, '-linux-') && 'debuginfo' || 'symbols' }}
       MACOSX_DEPLOYMENT_TARGET: "11.0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -186,7 +191,13 @@ jobs:
           ws="$(to_native "$GITHUB_WORKSPACE")"
           cargo_home="$(to_native "${CARGO_HOME:-$HOME/.cargo}")"
           rustup_home="$(to_native "${RUSTUP_HOME:-$HOME/.rustup}")"
-          echo "RUSTFLAGS=--remap-path-prefix=$ws=/qoresign --remap-path-prefix=$cargo_home=/cargo --remap-path-prefix=$rustup_home=/rustup --remap-path-prefix=/root/.cargo=/cargo --remap-path-prefix=/root/.rustup=/rustup" >> "$GITHUB_ENV"
+          flags="--remap-path-prefix=$ws=/qoresign --remap-path-prefix=$cargo_home=/cargo --remap-path-prefix=$rustup_home=/rustup --remap-path-prefix=/root/.cargo=/cargo --remap-path-prefix=/root/.rustup=/rustup"
+          # Linux: drop the local symbols, keep the global UNIFFI_META_* ones
+          # that the bindings are generated from (see CARGO_PROFILE_RELEASE_STRIP).
+          case "${{ matrix.target }}" in
+            *-linux-*) flags="$flags -C link-arg=-Wl,--discard-all" ;;
+          esac
+          echo "RUSTFLAGS=$flags" >> "$GITHUB_ENV"
       - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           maturin-version: "1.15.0"
@@ -202,7 +213,7 @@ jobs:
           working-directory: python
           command: sdist
           args: --out dist
-      - name: No build-machine paths in the wheels
+      - name: Bindings present, no build-machine paths in the wheels
         run: scripts/build-python-wheels.sh check
       - name: pytest
         if: matrix.test

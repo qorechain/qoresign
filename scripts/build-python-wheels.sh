@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Builds the Python package qorechain-qoresign (python/) from crates/qoresign-ffi
-# with maturin (UniFFI bindings) and checks that no build-machine path ends up
-# in the wheels.
+# with maturin (UniFFI bindings) and checks that every wheel carries the
+# generated bindings and that no build-machine path ends up in the wheels.
 #
 # Usage: scripts/build-python-wheels.sh [target...]
 #
@@ -41,6 +41,16 @@ export RUSTFLAGS="$REMAP"
 export CARGO_PROFILE_RELEASE_LTO=true
 export CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1
 export CARGO_PROFILE_RELEASE_STRIP=symbols
+# maturin generates the Python bindings from the built library (UniFFI library
+# mode). Mach-O and PE libraries are read through their export tables, which
+# stripping keeps. ELF libraries are read through the static symbol table
+# (.symtab), which strip=symbols removes, leaving an empty qoresign._ffi. On
+# Linux, drop the debug info and the local symbols only; the global
+# UNIFFI_META_* symbols stay. Same settings as .github/workflows/release.yml.
+if [ "$(uname -s)" = Linux ]; then
+  export CARGO_PROFILE_RELEASE_STRIP=debuginfo
+  export RUSTFLAGS="$RUSTFLAGS -C link-arg=-Wl,--discard-all"
+fi
 export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-11.0}"
 
 check_maturin() {
@@ -103,6 +113,23 @@ check_tree() {
   return "$bad"
 }
 
+# A wheel must carry the generated bindings next to the native library. When
+# UniFFI finds no metadata in the library, maturin still builds a wheel, with
+# an empty qoresign/_ffi/__init__.py and no qoresign_ffi.py.
+check_bindings() {
+  local label="$1" ffi="$2/qoresign/_ffi" lib
+  lib="$(find "$ffi" -maxdepth 1 -type f \( -name '*.so' -o -name '*.dylib' -o -name '*.dll' \) 2> /dev/null | head -n 1)"
+  if [ -z "$lib" ]; then
+    echo "$label: no native library in qoresign/_ffi"
+    return 1
+  fi
+  if ! grep -q '^def ' "$ffi/qoresign_ffi.py" 2> /dev/null || ! grep -q 'qoresign_ffi' "$ffi/__init__.py"; then
+    echo "$label: qoresign/_ffi has no generated bindings (UniFFI found no metadata in $(basename "$lib"))"
+    return 1
+  fi
+  echo "$label: bindings $(wc -c < "$ffi/qoresign_ffi.py" | tr -d ' ') bytes, $(basename "$lib")"
+}
+
 check_paths() {
   local work bad=0 f
   work="$(mktemp -d)"
@@ -110,7 +137,7 @@ check_paths() {
   for f in "$DIST"/*.whl "$DIST"/*.tar.gz; do
     rm -rf "${work:?}"/*
     case "$f" in
-      *.whl) unzip_to "$f" "$work" ;;
+      *.whl) unzip_to "$f" "$work"; check_bindings "$(basename "$f")" "$work" || bad=1 ;;
       *) tar -xzf "$f" -C "$work" ;;
     esac
     check_tree "$(basename "$f")" "$work" || bad=1
@@ -118,10 +145,10 @@ check_paths() {
   shopt -u nullglob
   rm -rf "$work"
   if [ "$bad" != 0 ]; then
-    echo "build-machine paths found in python/dist" >&2
+    echo "python/dist failed the checks (missing bindings or build-machine paths)" >&2
     exit 1
   fi
-  echo "no build-machine paths in python/dist"
+  echo "python/dist: bindings present, no build-machine paths"
 }
 
 build() {
