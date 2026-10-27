@@ -1,0 +1,6 @@
+{
+  "entryPoints": ["src/index.ts", "src/network.ts"],
+  "out": "../../docs/reference/ts",
+  "excludePrivate": true,
+  "readme": "none"
+}
