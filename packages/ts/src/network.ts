@@ -334,3 +334,5 @@ export async function fetchCommittedExtensionTypeUrls(opts: RestOptions & { txha
   if (!Array.isArray(opts2)) return [];
   return (opts2 as Record<string, unknown>[]).map((e) => String(e["@type"] ?? e.type_url ?? ""));
 }
+
+export { fetchEvmWindow, inspectTransaction, type EvmWindow, type InspectedTransaction, type TxSecurityTier } from "./inspect.js";
