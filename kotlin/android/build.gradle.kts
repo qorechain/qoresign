@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "io.github.qorechain"
-version = "0.1.0"
+version = "0.1.1"
 
 val jnaVersion = "5.19.1"
 

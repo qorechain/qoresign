@@ -1,6 +1,6 @@
 {
   "name": "@qorechain/qoresign",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Hybrid secp256k1 + ML-DSA-87 (FIPS 204) signing, verification and Sign In With QoreChain for wallets and backends on QoreChain.",
   "license": "Apache-2.0",
   "author": "QoreChain Association",

@@ -18,8 +18,8 @@
 import Foundation
 import PackageDescription
 
-let releaseVersion = "0.1.0"
-let releaseChecksum = "b4f38fd0ba3b496a3c0ab1c3063e7fcede5405bd70992be1e31f8e84e1b84eee"
+let releaseVersion = "0.1.1"
+let releaseChecksum = "968fa45a1100963642f21483665cbc57e50f39da1001ad103166ff2023d829f6"
 
 let localFFIPath = "swift/QoreSignFFI.xcframework"
 let packageDir = URL(fileURLWithPath: #filePath).deletingLastPathComponent().path

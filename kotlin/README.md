@@ -26,9 +26,9 @@ messages and SIWQ. Fetching account numbers and broadcasting stay in your app.
 
 ```kotlin
 // JVM
-implementation("io.github.qorechain:qoresign:0.1.0")
+implementation("io.github.qorechain:qoresign:0.1.1")
 // Android
-implementation("io.github.qorechain:qoresign-android:0.1.0")
+implementation("io.github.qorechain:qoresign-android:0.1.1")
 ```
 
 The Android AAR ships R8 keep rules for JNA and the bindings.
