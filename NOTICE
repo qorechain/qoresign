@@ -1,0 +1,38 @@
+QoreSign
+Copyright 2026 QoreChain Association
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+It depends on the following third-party software, each under its own license:
+
+TypeScript package (@qorechain/qoresign)
+  @qorechain/pqc            Apache-2.0  QoreChain Association
+  @noble/post-quantum       MIT         Paul Miller (via @qorechain/pqc)
+  @noble/curves             MIT         Paul Miller
+  @noble/hashes             MIT         Paul Miller
+  @scure/base               MIT         Paul Miller
+  @scure/bip32              MIT         Patricio Palladino, Paul Miller
+  @scure/bip39              MIT         Patricio Palladino, Paul Miller
+
+Rust crate (qorechain-qoresign)
+  qorechain-pqc             Apache-2.0  QoreChain Association
+  fips204                   MIT OR Apache-2.0 (via qorechain-pqc)
+  k256, bip32, sha2, sha3, ripemd, hmac   MIT OR Apache-2.0  RustCrypto
+  bip39                     CC0-1.0     rust-bitcoin (also bitcoin_hashes, hex-conservative)
+  bech32                    MIT         rust-bitcoin
+  base64, hex, serde, serde_json, thiserror   MIT OR Apache-2.0
+  unicode-normalization, unicode-ident        Unicode-3.0 (transitive)
+
+Swift and Kotlin bindings (built from crates/qoresign-ffi)
+  uniffi                    MPL-2.0     Mozilla (runtime support compiled into the native library and the generated bindings)
+  JNA                       Apache-2.0 (dual-licensed Apache-2.0 / LGPL-2.1, used under Apache-2.0)
+
+Go module (github.com/qorechain/qoresign/go)
+  github.com/qorechain/qorechain-pqc/go      Apache-2.0  QoreChain Association
+  github.com/cloudflare/circl                BSD-3-Clause
+  github.com/decred/dcrd/dcrec/secp256k1/v4  ISC
+  github.com/cosmos/go-bip39                 MIT
+  github.com/cosmos/btcutil                  ISC
+  golang.org/x/crypto, golang.org/x/sys      BSD-3-Clause
+
+The MPL-2.0 files of uniffi are used unmodified; their source is available at https://github.com/mozilla/uniffi-rs.

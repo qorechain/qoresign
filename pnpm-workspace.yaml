@@ -1,0 +1,8 @@
+packages:
+  - "packages/*"
+  - "examples/*"
+
+# Supply-chain settings (honoured by pnpm 10.26 and later).
+minimumReleaseAge: 10080
+trustPolicy: no-downgrade
+blockExoticSubdeps: true

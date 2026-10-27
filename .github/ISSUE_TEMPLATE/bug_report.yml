@@ -1,0 +1,35 @@
+name: Bug report
+description: Something does not work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not report security vulnerabilities here; see SECURITY.md."
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      options: [TypeScript, Rust, Go, Swift, Kotlin, Specification or vectors]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: A minimal snippet. Never paste a mnemonic or private key that holds funds.
+  - type: input
+    id: network
+    attributes:
+      label: Network (chain id), if relevant
