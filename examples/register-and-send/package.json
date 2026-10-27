@@ -1,0 +1,16 @@
+{
+  "name": "@qorechain/qoresign-example-register-and-send",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "dependencies": {
+    "@qorechain/qoresign": "workspace:^",
+    "@cosmjs/amino": "0.39.0",
+    "@cosmjs/proto-signing": "0.39.0",
+    "cosmjs-types": "0.11.0"
+  }
+}
