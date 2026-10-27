@@ -7,6 +7,7 @@ All notable changes are listed here. Versions follow [Semantic Versioning](https
 ### Added
 
 - Python package `qorechain-qoresign` (import `qoresign`), bindings over the Rust implementation: wheels for macOS, Linux (manylinux2014) and Windows, Python 3.9+, checked against `vectors/qoresign-v1.json`.
+- TypeScript `@qorechain/qoresign/network`: `inspectTransaction` (messages, signer, fee, ML-DSA-87 layer verified against the registered key, security tier) and `fetchEvmWindow`.
 
 ### Fixed
 
