@@ -93,7 +93,7 @@ xcodebuild -create-xcframework \
   -output "$XCFRAMEWORK"
 
 echo "==> zip"
-(cd "$OUT" && ditto -c -k --sequesterRsrc --keepParent QoreSignFFI.xcframework QoreSignFFI.xcframework.zip)
+(cd "$OUT" && ditto -c -k --norsrc --noextattr --keepParent QoreSignFFI.xcframework QoreSignFFI.xcframework.zip)
 CHECKSUM="$(swift package compute-checksum "$ZIP")"
 echo "$CHECKSUM" > "$ZIP.sha256"
 
