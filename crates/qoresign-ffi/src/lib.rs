@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// UniFFI surface of QoreSign for the Swift and Kotlin packages. Thin
-// conversions over the `qoresign` crate; no logic of its own.
+// UniFFI surface of QoreSign for the Swift, Kotlin and Python packages.
+// Thin conversions over the `qoresign` crate; no logic of its own.
 
 use qoresign as core;
 

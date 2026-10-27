@@ -1,6 +1,6 @@
 # Test vectors
 
-`qoresign-v1.json` is generated from the TypeScript implementation (`pnpm build && pnpm vectors`) and checked by the TypeScript, Rust, Go, Swift and Kotlin test suites. A change to the file is a change to the wire format: add a new file with a new version instead of editing this one.
+`qoresign-v1.json` is generated from the TypeScript implementation (`pnpm build && pnpm vectors`) and checked by the TypeScript, Rust, Go, Swift, Kotlin and Python test suites. A change to the file is a change to the wire format: add a new file with a new version instead of editing this one.
 
 Every key is derived from the public BIP-39 test mnemonic (`abandon ... about`). Never send funds to these accounts.
 

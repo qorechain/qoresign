@@ -1,0 +1,57 @@
+# SPDX-License-Identifier: Apache-2.0
+[build-system]
+requires = ["maturin==1.15.0"]
+build-backend = "maturin"
+
+[project]
+name = "qorechain-qoresign"
+version = "0.1.1"
+description = "Hybrid secp256k1 + ML-DSA-87 (FIPS 204) signing, verification and Sign In With QoreChain."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "Apache-2.0"
+authors = [{ name = "QoreChain Association" }]
+keywords = ["qorechain", "ml-dsa", "fips-204", "secp256k1", "signing", "wallet"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Rust",
+    "Topic :: Security :: Cryptography",
+    "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://github.com/qorechain/qoresign"
+Repository = "https://github.com/qorechain/qoresign"
+Documentation = "https://github.com/qorechain/qoresign/tree/main/python"
+Changelog = "https://github.com/qorechain/qoresign/blob/main/CHANGELOG.md"
+Issues = "https://github.com/qorechain/qoresign/issues"
+
+[tool.maturin]
+bindings = "uniffi"
+manifest-path = "../crates/qoresign-ffi/Cargo.toml"
+module-name = "qoresign._ffi"
+python-source = "."
+locked = true
+strip = true
+# LICENSE and NOTICE are copied from the repository root by
+# scripts/build-python-wheels.sh and the release workflow.
+include = [
+    { path = "LICENSE", format = "sdist" },
+    { path = "NOTICE", format = "sdist" },
+]
+
+[tool.maturin.sbom]
+# The Rust SBOM records build-machine paths.
+rust = false

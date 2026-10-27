@@ -27,6 +27,10 @@ Swift and Kotlin bindings (built from crates/qoresign-ffi)
   uniffi                    MPL-2.0     Mozilla (runtime support compiled into the native library and the generated bindings)
   JNA                       Apache-2.0 (dual-licensed Apache-2.0 / LGPL-2.1, used under Apache-2.0)
 
+Python package (qorechain-qoresign, built from crates/qoresign-ffi)
+  uniffi                    MPL-2.0     Mozilla (runtime support compiled into the native library and the generated bindings)
+  maturin                   MIT OR Apache-2.0  PyO3 (build tool only, not distributed)
+
 Go module (github.com/qorechain/qoresign/go)
   github.com/qorechain/qorechain-pqc/go      Apache-2.0  QoreChain Association
   github.com/cloudflare/circl                BSD-3-Clause

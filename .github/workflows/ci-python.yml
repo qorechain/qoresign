@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: Apache-2.0
+name: ci-python
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.9", "3.13"]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal
+          rustup default 1.95.0
+      - name: Build tools
+        run: python -m pip install -r python/requirements-dev.txt
+      - name: Build the wheel and the sdist
+        run: scripts/build-python-wheels.sh host sdist
+      - name: twine check
+        if: matrix.python != '3.9'
+        run: python -m twine check --strict python/dist/*
+      - name: pytest
+        run: |
+          python -m pip install --no-index --find-links python/dist qorechain-qoresign
+          pytest python/tests

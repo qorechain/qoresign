@@ -6,7 +6,7 @@ edition = "2021"
 license = "Apache-2.0"
 authors = ["QoreChain Association"]
 repository = "https://github.com/qorechain/qoresign"
-description = "UniFFI bindings of QoreSign for the Swift and Kotlin packages."
+description = "UniFFI bindings of QoreSign for the Swift, Kotlin and Python packages."
 publish = false
 
 [lib]

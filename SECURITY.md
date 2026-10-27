@@ -8,7 +8,7 @@ Please **do not** report vulnerabilities through public issues, discussions or p
 
 **security@qore.network**
 
-Include, as far as you can: a description and the impact, steps to reproduce or a proof of concept, the affected package (TypeScript, Rust, Go, Swift or Kotlin) and version, and a suggested fix.
+Include, as far as you can: a description and the impact, steps to reproduce or a proof of concept, the affected package (TypeScript, Rust, Go, Swift, Kotlin or Python) and version, and a suggested fix.
 
 Qualifying reports are eligible for the QoreChain bug bounty; scope and rules are published at <https://www.qorechain.io/security>.
 

@@ -1,6 +1,6 @@
 # QoreSign
 
-> Hybrid secp256k1 + ML-DSA-87 (FIPS 204) signing, verification and Sign In With QoreChain for wallets and backends on QoreChain. TypeScript, Rust, Go, Swift, Kotlin. Apache-2.0.
+> Hybrid secp256k1 + ML-DSA-87 (FIPS 204) signing, verification and Sign In With QoreChain for wallets and backends on QoreChain. TypeScript, Rust, Go, Swift, Kotlin, Python. Apache-2.0.
 
 Lanes: native (Cosmos SDK) = hybrid signing, required by the network by default; EVM = quantum-ready mode only (registered ML-DSA-87 key + authorization window opened from the native lane); SVM = not open yet.
 Networks: mainnet chain id qorechain-vladi (REST https://api.qore.host), testnet qorechain-diana (REST https://api-testnet.qore.host). Bech32 prefix qor, coin type 118 (eth-native accounts: 60), fee denom uqor (6 decimals), minimum gas price 0.1 uqor.
@@ -30,6 +30,12 @@ Networks: mainnet chain id qorechain-vladi (REST https://api.qore.host), testnet
 - assertHybridLane, decideLane, evaluateLayerState
 - @qorechain/qoresign/network: fetchPqKeyStatus, resolveSignBytesVersion, simulateTx, broadcastTx, submitWithSignBytesFallback, assertPqLayerMatchesRegisteredKey, verifySiwqWithChain, verifyMessageWithChain
 - Errors: QoreSignError with a stable `code` (e.g. PQ_SIGNATURE_INVALID, KEY_NOT_REGISTERED, LANE_NOT_AVAILABLE, SIMULATION_FAILED)
+
+## Other packages
+- Rust: crate qorechain-qoresign (crates/qoresign), same names in snake_case
+- Go: github.com/qorechain/qoresign/go, includes network helpers
+- Swift (QoreSign), Kotlin (io.github.qorechain:qoresign), Python (pip install qorechain-qoresign, import qoresign): offline bindings over the Rust crate, no network helpers. Python names are snake_case (derive_classical_key, sign_hybrid, verify_siwq, ...); errors raise qoresign.QoreSignError with .code and .detail
+- [Python README](python/README.md)
 
 ## Examples
 - [examples](examples/README.md): derive-and-verify (offline), register-and-send (testnet), siwq-server (testnet)

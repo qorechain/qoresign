@@ -8,10 +8,11 @@ Thanks for your interest. Issues, pull requests and discussion are welcome.
 |---|---|
 | `packages/ts` | TypeScript package `@qorechain/qoresign` (the reference implementation) |
 | `crates/qoresign` | Rust crate `qorechain-qoresign` |
-| `crates/qoresign-ffi` | bindings layer used by the Swift and Kotlin packages (not published) |
+| `crates/qoresign-ffi` | bindings layer used by the Swift, Kotlin and Python packages (not published) |
 | `go` | Go module `github.com/qorechain/qoresign/go` |
 | `swift`, `Package.swift` | Swift package `QoreSign` |
 | `kotlin` | Kotlin/JVM library `io.github.qorechain:qoresign` |
+| `python` | Python package `qorechain-qoresign` (import `qoresign`) |
 | `spec` | wire formats |
 | `vectors` | test vectors shared by every implementation |
 | `docs`, `examples` | guides and runnable examples |
@@ -22,9 +23,12 @@ Thanks for your interest. Issues, pull requests and discussion are welcome.
 pnpm install && pnpm build && pnpm lint && pnpm typecheck && pnpm test   # TypeScript
 cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test   # Rust
 (cd go && gofmt -l . && go vet ./... && go test ./...)                      # Go
+pip install -r python/requirements-dev.txt && scripts/build-python-wheels.sh \
+  && pip install --no-index --find-links python/dist qorechain-qoresign \
+  && pytest python/tests                                                     # Python (in a venv)
 ```
 
-Swift and Kotlin: see `swift/README.md` and `kotlin/README.md`.
+Swift, Kotlin and Python: see `swift/README.md`, `kotlin/README.md` and `python/README.md`.
 
 Integration tests against the `qorechain-diana` testnet run only with `QORE_LIVE_TEST=1` and `QORE_TEST_MNEMONIC` set to a funded testnet account.
 

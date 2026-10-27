@@ -2,6 +2,17 @@
 
 All notable changes are listed here. Versions follow [Semantic Versioning](https://semver.org); before 1.0, a minor version may contain breaking changes, which are always called out.
 
+## [0.1.1] - Unreleased
+
+### Added
+
+- Python package `qorechain-qoresign` (import `qoresign`), bindings over the Rust implementation: wheels for macOS, Linux (manylinux2014) and Windows, Python 3.9+, checked against `vectors/qoresign-v1.json`.
+
+### Fixed
+
+- The Swift xcframework zip no longer contains a resource-fork folder.
+- The macOS native libraries (Kotlin and Python packages) no longer record the build directory as their install name.
+
 ## [0.1.0] - 2026-10-27
 
 First release, in TypeScript, Rust, Go, Swift and Kotlin.

@@ -13,7 +13,7 @@
   - [Message signing v1](../spec/message-signing-v1.md)
   - [ML-DSA-87 key derivation](../spec/hd-derivation-draft.md)
 - [Test vectors](../vectors/README.md)
-- API reference: run `pnpm -C packages/ts docs` (TypeScript), `cargo doc -p qorechain-qoresign` (Rust), `go doc github.com/qorechain/qoresign/go` (Go). Swift and Kotlin bindings mirror the Rust API; see [swift/README.md](../swift/README.md) and [kotlin/README.md](../kotlin/README.md).
+- API reference: run `pnpm -C packages/ts docs` (TypeScript), `cargo doc -p qorechain-qoresign` (Rust), `go doc github.com/qorechain/qoresign/go` (Go). Swift, Kotlin and Python bindings mirror the Rust API; see [swift/README.md](../swift/README.md), [kotlin/README.md](../kotlin/README.md) and [python/README.md](../python/README.md) (`help(qoresign)` in Python).
 
 ## What QoreSign covers today
 

@@ -21,3 +21,9 @@ out/
 kotlin/natives/
 kotlin/android/src/main/jniLibs/
 local.properties
+python/LICENSE
+python/NOTICE
+python/qoresign/_ffi/
+__pycache__/
+.venv/
+.pytest_cache/

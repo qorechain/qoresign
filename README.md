@@ -19,8 +19,9 @@ QoreSign lets a wallet other than QoreChain's own derive an account's ML-DSA-87 
 | Go | [`github.com/qorechain/qoresign/go`](go) | `go get github.com/qorechain/qoresign/go` |
 | Swift | [`QoreSign`](swift) (Swift Package, iOS 16+, macOS 13+) | `.package(url: "https://github.com/qorechain/qoresign", from: "0.1.0")` |
 | Kotlin / JVM | [`io.github.qorechain:qoresign`](kotlin) | `implementation("io.github.qorechain:qoresign:0.1.0")` |
+| Python | [`qorechain-qoresign`](python) (import `qoresign`, Python 3.9+) | `pip install qorechain-qoresign` |
 
-All five implementations check themselves against the same [test vectors](vectors).
+All six packages check themselves against the same [test vectors](vectors).
 
 ## Example
 

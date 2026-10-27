@@ -9,7 +9,7 @@ body:
     id: package
     attributes:
       label: Package
-      options: [TypeScript, Rust, Go, Swift, Kotlin, Specification or vectors]
+      options: [TypeScript, Rust, Go, Swift, Kotlin, Python, Specification or vectors]
     validations:
       required: true
   - type: input
