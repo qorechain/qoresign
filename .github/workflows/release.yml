@@ -244,8 +244,10 @@ jobs:
         run: |
           version="$(sed -nE 's/^let releaseVersion = "([^"]+)".*/\1/p' Package.swift)"
           test "v$version" = "$TAG" || { echo "Package.swift releaseVersion $version does not match $TAG"; exit 1; }
-      - name: Create the release if needed
-        run: gh release view "$TAG" > /dev/null 2>&1 || gh release create "$TAG" --verify-tag --title "$TAG" --notes "See CHANGELOG.md."
+      - name: The release exists
+        # Created by hand by the maintainer before the tag is pushed; this job
+        # only attaches files and never creates a release.
+        run: gh release view "$TAG" > /dev/null 2>&1 || { echo "Create the GitHub release $TAG by hand first, then re-run this job."; exit 1; }
       - name: Attach the Kotlin packages
         run: gh release upload "$TAG" artifacts/kotlin-packages/* --clobber
       - name: Attach the Python wheels and sdist
