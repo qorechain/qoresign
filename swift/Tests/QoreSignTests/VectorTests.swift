@@ -252,6 +252,36 @@ final class VectorTests: XCTestCase {
         XCTAssertEqual(errorCode { _ = try parseSiwqMessage(message: "hello") }, "SIWQ_MALFORMED")
     }
 
+    func testSiwqMaxAge() throws {
+        let f = (v["siwq"] as! [String: Any])["fields"] as! [String: Any]
+        let issuedAt = f["issuedAt"] as! String
+        let fields = SiwqFields(
+            domain: f["domain"] as! String, address: f["address"] as! String, uri: f["uri"] as! String,
+            chainId: f["chainId"] as! String, nonce: f["nonce"] as! String, issuedAt: issuedAt)
+        let message = try createSiwqMessage(fields: fields)
+        let signature = try signSiwq(message: message, classicalKey: classical, pqKey: pq)
+        let issued = Int64(try XCTUnwrap(ISO8601DateFormatter().date(from: issuedAt)).timeIntervalSince1970 * 1000)
+
+        func verifyCode(nowMs: Int64, maxAgeSeconds: Int64? = nil) -> String? {
+            errorCode {
+                if let maxAgeSeconds {
+                    _ = try verifySiwq(message: message, signature: signature, domain: "app.example.com",
+                                       nonce: "a1b2c3d4e5", pqPublicKey: self.pq.publicKey, nowMs: nowMs,
+                                       maxAgeSeconds: maxAgeSeconds)
+                } else {
+                    _ = try verifySiwq(message: message, signature: signature, domain: "app.example.com",
+                                       nonce: "a1b2c3d4e5", pqPublicKey: self.pq.publicKey, nowMs: nowMs)
+                }
+            }
+        }
+        // Without an expiration time the default maximum age is 600 seconds.
+        XCTAssertNil(verifyCode(nowMs: issued + 600_000))
+        XCTAssertEqual(verifyCode(nowMs: issued + 600_001), "SIWQ_EXPIRED")
+        XCTAssertNil(verifyCode(nowMs: issued + 3_540_000, maxAgeSeconds: 3600))
+        XCTAssertEqual(verifyCode(nowMs: issued + 31_000, maxAgeSeconds: 30), "SIWQ_EXPIRED")
+        XCTAssertEqual(verifyCode(nowMs: issued, maxAgeSeconds: 0), "INVALID_ARGUMENT")
+    }
+
     func testMessage() throws {
         let m = v["message"] as! [String: Any]
         XCTAssertEqual(m["signer"] as? String, address)

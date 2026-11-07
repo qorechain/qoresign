@@ -231,6 +231,32 @@ class VectorTest {
     }
 
     @Test
+    fun siwqMaxAge() {
+        val f = vectors.getValue("siwq").jsonObject.getValue("fields")
+        val fields = SiwqFields(
+            domain = f.str("domain"),
+            address = f.str("address"),
+            uri = f.str("uri"),
+            chainId = f.str("chainId"),
+            nonce = f.str("nonce"),
+            issuedAt = f.str("issuedAt"),
+        )
+        val message = createSiwqMessage(fields)
+        val signature = signSiwq(message, classical, pq)
+        val issued = Instant.parse(f.str("issuedAt")).toEpochMilli()
+
+        fun code(now: Long, maxAgeSeconds: Long = 600L) = errorCode {
+            verifySiwq(message, signature, "app.example.com", "a1b2c3d4e5", pq.publicKey, nowMs = now, maxAgeSeconds = maxAgeSeconds)
+        }
+        // Without an expiration time the default maximum age is 600 seconds.
+        assertNull(errorCode { verifySiwq(message, signature, "app.example.com", "a1b2c3d4e5", pq.publicKey, nowMs = issued + 600_000) })
+        assertEquals("SIWQ_EXPIRED", errorCode { verifySiwq(message, signature, "app.example.com", "a1b2c3d4e5", pq.publicKey, nowMs = issued + 600_001) })
+        assertNull(code(issued + 3_540_000, maxAgeSeconds = 3600))
+        assertEquals("SIWQ_EXPIRED", code(issued + 31_000, maxAgeSeconds = 30))
+        assertEquals("INVALID_ARGUMENT", code(issued, maxAgeSeconds = 0))
+    }
+
+    @Test
     fun message() {
         val m = vectors.getValue("message")
         assertEquals(address, m.str("signer"))

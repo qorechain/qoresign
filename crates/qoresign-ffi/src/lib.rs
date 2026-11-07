@@ -794,13 +794,16 @@ pub fn sign_siwq(
 
 /// Verify a sign-in and return its fields. `now_ms` is Unix milliseconds;
 /// null reads the system clock. A classical-only sign-in is refused unless
-/// `require_pq` is false.
+/// `require_pq` is false. A message without an expiration time is refused
+/// once it is older than `max_age_seconds` (default 600, must be positive),
+/// counted from its issued-at time.
 #[uniffi::export(default(
     pq_public_key = None,
     chain_id = None,
     require_pq = true,
     now_ms = None,
-    clock_skew_seconds = 60
+    clock_skew_seconds = 60,
+    max_age_seconds = 600
 ))]
 #[allow(clippy::too_many_arguments)]
 pub fn verify_siwq(
@@ -813,6 +816,7 @@ pub fn verify_siwq(
     require_pq: bool,
     now_ms: Option<i64>,
     clock_skew_seconds: i64,
+    max_age_seconds: i64,
 ) -> Result<SiwqFields> {
     let signature: core::SiwqSignature = signature.into();
     let args = core::VerifySiwqArgs {
@@ -825,6 +829,7 @@ pub fn verify_siwq(
         require_pq,
         now_ms,
         clock_skew_seconds,
+        max_age_seconds,
     };
     Ok(core::verify_siwq(&args)?.into())
 }

@@ -41,6 +41,21 @@ result, err := client.VerifySiwqWithChain(ctx, address, qoresign.VerifySiwqOptio
 // result.SiwqFields holds the verified fields; result.PossessionProven reports the key's proof of possession.
 ```
 
+## Message lifetime
+
+Set `expirationTime` on every message your server asks the wallet to sign, a few minutes after `issuedAt`. A message without `expirationTime` is accepted only for a maximum age counted from `issuedAt`: 10 minutes by default. To change it, pass a positive value:
+
+| Implementation | Option |
+| --- | --- |
+| TypeScript | `maxAgeSeconds: 300` |
+| Go | `MaxAge: 5 * time.Minute` |
+| Rust | `args.max_age_seconds = 300` |
+| Python | `max_age_seconds=300` |
+| Swift | `maxAgeSeconds: 300` |
+| Kotlin | `maxAgeSeconds = 300` |
+
+A message older than that fails with `SIWQ_EXPIRED`; a zero or negative value fails with `INVALID_ARGUMENT`. The maximum age is not used when the message has `expirationTime`.
+
 ## Classical-only accounts
 
 `verifySiwq` refuses a sign-in without the ML-DSA-87 part unless `requirePq: false` is passed. Accept classical-only sign-ins only if your service does not need the post-quantum guarantee.

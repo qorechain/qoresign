@@ -89,7 +89,7 @@ pub use sign::{
 pub use siwq::{
     adr36_sign_bytes, create_siwq_message, parse_siwq_message, parse_timestamp_ms, sign_siwq,
     siwq_pq_sign_bytes, verify_siwq, SiwqClassicalSignature, SiwqFields, SiwqPqSignature,
-    SiwqSignature, SiwqSignatureType, VerifySiwqArgs, SIWQ_PQ_DOMAIN,
+    SiwqSignature, SiwqSignatureType, VerifySiwqArgs, SIWQ_DEFAULT_MAX_AGE_SECONDS, SIWQ_PQ_DOMAIN,
 };
 pub use verify::{
     verify_hybrid_tx, verify_pq_layer, HybridTxResult, PqLayerFailure, PqLayerResult,

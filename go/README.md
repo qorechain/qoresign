@@ -77,7 +77,9 @@ if qoresign.IsCode(err, qoresign.CodeSiwqExpired) {
 
 `qoresign.VerifySiwq` does the same checks offline when you already hold the
 account's registered ML-DSA-87 public key. A classical-only sign-in is refused
-unless `RequirePq` points to `false`.
+unless `RequirePq` points to `false`. A message without `ExpirationTime` is
+accepted for `MaxAge` after its `IssuedAt` (default 10 minutes; set a positive
+duration to change it).
 
 ## Sign a message
 

@@ -101,7 +101,9 @@ Byte fields are `bytes`; records are plain classes with keyword-only
 constructors and value equality. Optional arguments default to the same
 values as the TypeScript package (v2 sign-bytes, deterministic ML-DSA-87,
 hybrid mode). `verify_siwq(..., now_ms=...)` takes Unix milliseconds; `None`
-reads the system clock. Format constants (`ML_DSA_87_SIGNATURE_LENGTH`,
+reads the system clock. A sign-in message without an expiration time is
+accepted for `max_age_seconds` after its issued-at time (default 600; pass a
+positive value to change it). Format constants (`ML_DSA_87_SIGNATURE_LENGTH`,
 `PQC_HYBRID_TYPE_URL`, ...) are module attributes.
 
 ## Build locally

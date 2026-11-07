@@ -3,6 +3,7 @@ import { makeSignDoc, serializeSignDoc } from "@cosmjs/amino";
 import { describe, expect, it } from "vitest";
 import {
   QoreSignError,
+  SIWQ_DEFAULT_MAX_AGE_SECONDS,
   addressFromPublicKey,
   adr36SignBytes,
   createSiwqMessage,
@@ -148,6 +149,27 @@ describe("sign and verify", () => {
     const base = { message, signature: sig, domain: "app.example.com", nonce: "a1b2c3d4e5", now };
     expect(errCode(() => verifySiwq(base))).toBe("PQ_LAYER_MISSING");
     expect(verifySiwq({ ...base, requirePq: false }).address).toBe(address);
+  });
+
+  it("applies a maximum age when there is no expirationTime", () => {
+    const msg = createSiwqMessage({ ...fields, expirationTime: undefined });
+    const sig = signSiwq({ message: msg, classicalKey: classical, pqKey });
+    const base = { message: msg, signature: sig, domain: "app.example.com", nonce: "a1b2c3d4e5", pqPublicKey: pqKey.publicKey };
+    expect(SIWQ_DEFAULT_MAX_AGE_SECONDS).toBe(600);
+    expect(verifySiwq({ ...base, now: new Date("2026-10-27T10:10:00Z") }).address).toBe(address);
+    expect(errCode(() => verifySiwq({ ...base, now: new Date("2026-10-27T10:10:00.001Z") }))).toBe("SIWQ_EXPIRED");
+    expect(verifySiwq({ ...base, now: new Date("2026-10-27T10:59:00Z"), maxAgeSeconds: 3600 }).address).toBe(address);
+    expect(errCode(() => verifySiwq({ ...base, now: new Date("2026-10-27T10:00:31Z"), maxAgeSeconds: 30 }))).toBe(
+      "SIWQ_EXPIRED",
+    );
+    for (const bad of [0, -1, Number.NaN]) {
+      expect(errCode(() => verifySiwq({ ...base, now, maxAgeSeconds: bad }))).toBe("INVALID_ARGUMENT");
+    }
+    // With expirationTime the maximum age does not apply.
+    const withExpiration = { ...base, message, signature };
+    expect(verifySiwq({ ...withExpiration, now: new Date("2026-10-27T10:09:00Z"), maxAgeSeconds: 30 }).address).toBe(
+      address,
+    );
   });
 
   it("works for eth-native accounts", () => {

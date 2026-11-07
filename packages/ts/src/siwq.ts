@@ -238,11 +238,27 @@ export interface VerifySiwqArgs {
   now?: Date;
   /** Allowed clock skew for `issuedAt` and `notBefore`, in seconds. Default 60. */
   clockSkewSeconds?: number;
+  /**
+   * How long after `issuedAt` a message without `expirationTime` is accepted, in seconds.
+   * Default {@link SIWQ_DEFAULT_MAX_AGE_SECONDS} (10 minutes); must be positive. Not used
+   * when the message has `expirationTime`.
+   */
+  maxAgeSeconds?: number;
 }
 
-/** Verify a sign-in. Returns the parsed fields; throws a {@link QoreSignError} otherwise. */
+/** Default {@link VerifySiwqArgs.maxAgeSeconds}: 10 minutes. */
+export const SIWQ_DEFAULT_MAX_AGE_SECONDS = 600;
+
+/**
+ * Verify a sign-in. Returns the parsed fields; throws a {@link QoreSignError} otherwise.
+ * A message without `expirationTime` is refused once it is older than `maxAgeSeconds`.
+ */
 export function verifySiwq(args: VerifySiwqArgs): SiwqFields {
   const fields = parseSiwqMessage(args.message);
+  const maxAgeSeconds = args.maxAgeSeconds ?? SIWQ_DEFAULT_MAX_AGE_SECONDS;
+  if (typeof maxAgeSeconds !== "number" || !(maxAgeSeconds > 0)) {
+    throw new QoreSignError("INVALID_ARGUMENT", "maxAgeSeconds must be a positive number");
+  }
   if (fields.domain !== args.domain) {
     throw new QoreSignError("SIWQ_DOMAIN_MISMATCH", `message is for ${fields.domain}, expected ${args.domain}`);
   }
@@ -260,6 +276,12 @@ export function verifySiwq(args: VerifySiwqArgs): SiwqFields {
   }
   if (Date.parse(fields.issuedAt) > now + skew) {
     throw new QoreSignError("SIWQ_NOT_YET_VALID", "issuedAt is in the future");
+  }
+  if (fields.expirationTime === undefined && now - Date.parse(fields.issuedAt) > maxAgeSeconds * 1000) {
+    throw new QoreSignError(
+      "SIWQ_EXPIRED",
+      "the sign-in message has no expirationTime and is older than the maximum age",
+    );
   }
 
   const sig = args.signature;

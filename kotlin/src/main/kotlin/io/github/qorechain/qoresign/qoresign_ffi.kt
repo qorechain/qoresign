@@ -1003,7 +1003,7 @@ fun uniffi_qoresign_ffi_fn_func_verify_pq_layer(`chainId`: RustBuffer.ByValue,`b
 ): RustBuffer.ByValue
 fun uniffi_qoresign_ffi_fn_func_verify_proof_of_possession(`chainId`: RustBuffer.ByValue,`account`: RustBuffer.ByValue,`publicKey`: RustBuffer.ByValue,`proof`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): Byte
-fun uniffi_qoresign_ffi_fn_func_verify_siwq(`message`: RustBuffer.ByValue,`signature`: RustBuffer.ByValue,`domain`: RustBuffer.ByValue,`nonce`: RustBuffer.ByValue,`pqPublicKey`: RustBuffer.ByValue,`chainId`: RustBuffer.ByValue,`requirePq`: Byte,`nowMs`: RustBuffer.ByValue,`clockSkewSeconds`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_qoresign_ffi_fn_func_verify_siwq(`message`: RustBuffer.ByValue,`signature`: RustBuffer.ByValue,`domain`: RustBuffer.ByValue,`nonce`: RustBuffer.ByValue,`pqPublicKey`: RustBuffer.ByValue,`chainId`: RustBuffer.ByValue,`requirePq`: Byte,`nowMs`: RustBuffer.ByValue,`clockSkewSeconds`: Long,`maxAgeSeconds`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun ffi_qoresign_ffi_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
@@ -1245,7 +1245,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_qoresign_ffi_checksum_func_verify_proof_of_possession() != 48696.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_qoresign_ffi_checksum_func_verify_siwq() != 61139.toShort()) {
+    if (lib.uniffi_qoresign_ffi_checksum_func_verify_siwq() != 40434.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
 }
@@ -3827,13 +3827,15 @@ public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.Str
         /**
          * Verify a sign-in and return its fields. `now_ms` is Unix milliseconds;
          * null reads the system clock. A classical-only sign-in is refused unless
-         * `require_pq` is false.
+         * `require_pq` is false. A message without an expiration time is refused
+         * once it is older than `max_age_seconds` (default 600, must be positive),
+         * counted from its issued-at time.
          */
-    @Throws(QoreSignException::class) fun `verifySiwq`(`message`: kotlin.String, `signature`: SiwqSignature, `domain`: kotlin.String, `nonce`: kotlin.String, `pqPublicKey`: kotlin.ByteArray? = null, `chainId`: kotlin.String? = null, `requirePq`: kotlin.Boolean = true, `nowMs`: kotlin.Long? = null, `clockSkewSeconds`: kotlin.Long = 60L): SiwqFields {
+    @Throws(QoreSignException::class) fun `verifySiwq`(`message`: kotlin.String, `signature`: SiwqSignature, `domain`: kotlin.String, `nonce`: kotlin.String, `pqPublicKey`: kotlin.ByteArray? = null, `chainId`: kotlin.String? = null, `requirePq`: kotlin.Boolean = true, `nowMs`: kotlin.Long? = null, `clockSkewSeconds`: kotlin.Long = 60L, `maxAgeSeconds`: kotlin.Long = 600L): SiwqFields {
             return FfiConverterTypeSiwqFields.lift(
     uniffiRustCallWithError(QoreSignException) { _status ->
     UniffiLib.INSTANCE.uniffi_qoresign_ffi_fn_func_verify_siwq(
-        FfiConverterString.lower(`message`),FfiConverterTypeSiwqSignature.lower(`signature`),FfiConverterString.lower(`domain`),FfiConverterString.lower(`nonce`),FfiConverterOptionalByteArray.lower(`pqPublicKey`),FfiConverterOptionalString.lower(`chainId`),FfiConverterBoolean.lower(`requirePq`),FfiConverterOptionalLong.lower(`nowMs`),FfiConverterLong.lower(`clockSkewSeconds`),_status)
+        FfiConverterString.lower(`message`),FfiConverterTypeSiwqSignature.lower(`signature`),FfiConverterString.lower(`domain`),FfiConverterString.lower(`nonce`),FfiConverterOptionalByteArray.lower(`pqPublicKey`),FfiConverterOptionalString.lower(`chainId`),FfiConverterBoolean.lower(`requirePq`),FfiConverterOptionalLong.lower(`nowMs`),FfiConverterLong.lower(`clockSkewSeconds`),FfiConverterLong.lower(`maxAgeSeconds`),_status)
 }
     )
     }

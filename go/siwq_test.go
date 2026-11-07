@@ -251,6 +251,42 @@ func TestSiwqSignAndVerify(t *testing.T) {
 		}
 	})
 
+	t.Run("applies a maximum age when there is no expirationTime", func(t *testing.T) {
+		f := siwqFields()
+		f.ExpirationTime = ""
+		msg := must(qoresign.CreateSiwqMessage(f))
+		sig := must(qoresign.SignSiwq(qoresign.SignSiwqArgs{Message: msg, ClassicalKey: testClassical, PqKey: &pq}))
+		at := func(now time.Time, maxAge time.Duration) error {
+			o := base()
+			o.Message, o.Signature, o.Now, o.MaxAge = msg, sig, now, maxAge
+			_, err := qoresign.VerifySiwq(o)
+			return err
+		}
+		issued := time.Date(2026, 10, 27, 10, 0, 0, 0, time.UTC)
+		if qoresign.SiwqDefaultMaxAge != 10*time.Minute {
+			t.Fatal(qoresign.SiwqDefaultMaxAge)
+		}
+		if err := at(issued.Add(10*time.Minute), 0); err != nil {
+			t.Fatal(err)
+		}
+		if err := at(issued.Add(10*time.Minute+time.Millisecond), 0); errCode(err) != qoresign.CodeSiwqExpired {
+			t.Fatal(err)
+		}
+		if err := at(issued.Add(59*time.Minute), time.Hour); err != nil {
+			t.Fatal(err)
+		}
+		if err := at(issued.Add(31*time.Second), 30*time.Second); errCode(err) != qoresign.CodeSiwqExpired {
+			t.Fatal(err)
+		}
+		if err := at(issued, -time.Second); errCode(err) != qoresign.CodeInvalidArgument {
+			t.Fatal(err)
+		}
+		// With expirationTime the maximum age does not apply.
+		o := base()
+		o.Now, o.MaxAge = issued.Add(9*time.Minute), 30*time.Second
+		must(qoresign.VerifySiwq(o))
+	})
+
 	t.Run("works for eth-native accounts", func(t *testing.T) {
 		eth := must(qoresign.DeriveClassicalKey(testMnemonic, qoresign.DeriveClassicalOptions{Type: qoresign.EthSecp256k1}))
 		ethAddr := must(qoresign.AddressFromPublicKey(eth.PublicKey, qoresign.EthSecp256k1)).Bech32

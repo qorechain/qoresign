@@ -292,6 +292,34 @@ def test_siwq(v, ctx):
     assert error_code(qs.siwq_signature_from_json, "{}") == "SIWQ_MALFORMED"
 
 
+def test_siwq_max_age(v, ctx):
+    classical, pq = ctx["classical"], ctx["pq"]
+    f = v["siwq"]["fields"]
+    fields = qs.SiwqFields(
+        domain=f["domain"],
+        address=f["address"],
+        uri=f["uri"],
+        chain_id=f["chainId"],
+        nonce=f["nonce"],
+        issued_at=f["issuedAt"],
+    )
+    message = qs.create_siwq_message(fields)
+    signature = qs.sign_siwq(message, classical, pq_key=pq)
+    issued = iso_ms(f["issuedAt"])
+
+    def verify_code(now_ms, **kw):
+        return error_code(
+            qs.verify_siwq, message, signature, f["domain"], f["nonce"], pq_public_key=pq.public_key, now_ms=now_ms, **kw
+        )
+
+    # Without an expiration time the default maximum age is 600 seconds.
+    assert verify_code(issued + 600_000) is None
+    assert verify_code(issued + 600_001) == "SIWQ_EXPIRED"
+    assert verify_code(issued + 3_540_000, max_age_seconds=3600) is None
+    assert verify_code(issued + 31_000, max_age_seconds=30) == "SIWQ_EXPIRED"
+    assert verify_code(issued, max_age_seconds=0) == "INVALID_ARGUMENT"
+
+
 def test_message(v, ctx):
     chain_id, classical, pq, address = ctx["chain_id"], ctx["classical"], ctx["pq"], ctx["address"]
     m = v["message"]

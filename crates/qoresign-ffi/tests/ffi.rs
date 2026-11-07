@@ -352,6 +352,7 @@ fn siwq() {
         true,
         Some(now),
         60,
+        600,
     )
     .unwrap();
     assert_eq!(verified, parsed);
@@ -366,6 +367,7 @@ fn siwq() {
             true,
             Some(now_ms),
             60,
+            600,
         )
     };
     assert_eq!(
@@ -380,6 +382,39 @@ fn siwq() {
         code(verify("app.example.com", "a1b2c3d4e5", now + 3_600_000)),
         "SIWQ_EXPIRED"
     );
+
+    // Without an expiration time the maximum age applies (default 600 s).
+    let no_exp = create_siwq_message(SiwqFields {
+        expiration_time: None,
+        ..fields
+    })
+    .unwrap();
+    let no_exp_sig = sign_siwq(
+        no_exp.clone(),
+        c.classical.clone(),
+        Some(c.pq.clone()),
+        false,
+    )
+    .unwrap();
+    let issued = 1_793_095_200_000; // 2026-10-27T10:00:00Z
+    let verify_age = |now_ms: i64, max_age: i64| {
+        verify_siwq(
+            no_exp.clone(),
+            no_exp_sig.clone(),
+            "app.example.com".into(),
+            "a1b2c3d4e5".into(),
+            Some(c.pq.public_key.clone()),
+            None,
+            true,
+            Some(now_ms),
+            60,
+            max_age,
+        )
+    };
+    assert!(verify_age(issued + 600_000, 600).is_ok());
+    assert_eq!(code(verify_age(issued + 600_001, 600)), "SIWQ_EXPIRED");
+    assert!(verify_age(issued + 3_000_000, 3600).is_ok());
+    assert_eq!(code(verify_age(issued, 0)), "INVALID_ARGUMENT");
 }
 
 #[test]

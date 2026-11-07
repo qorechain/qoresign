@@ -34,6 +34,7 @@ Resources:
 - `Nonce` is at least 8 alphanumeric characters chosen by the server, single use.
 - Timestamps are RFC 3339 / ISO 8601.
 - `Expiration Time`, `Not Before`, `Request ID` and `Resources` are optional and appear in this order.
+- Servers SHOULD require `Expiration Time` and set it a few minutes after `Issued At`. A message without it is accepted only within the verifier's maximum age (see Verification).
 
 A verifier must re-render the parsed fields and refuse a message that does not match byte for byte.
 
@@ -75,7 +76,7 @@ A verifier must check, in this order:
 2. `domain` equals the domain the request came from;
 3. `nonce` equals the nonce the server issued for this session, and the nonce has not been used before;
 4. `Chain ID` is the expected network;
-5. `Expiration Time` is in the future, and `Not Before` and `Issued At` are not in the future (allowing a small clock skew);
+5. `Expiration Time` is in the future, and `Not Before` and `Issued At` are not in the future (allowing a small clock skew); when `Expiration Time` is absent, the time elapsed since `Issued At` is at most a maximum age (default 10 minutes, configurable by the verifier);
 6. the classical public key derives to `address` and the ADR-36 signature verifies;
 7. the ML-DSA-87 signature verifies under the public key **registered on chain** for `address` (`/qorechain/pqc/v1/account/{address}`), not under a key supplied by the client.
 

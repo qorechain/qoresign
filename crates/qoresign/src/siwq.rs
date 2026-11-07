@@ -18,6 +18,9 @@ use crate::sign::{classical_sign, classical_verify, pq_sign, pq_verify};
 
 /// Domain prefix of the ML-DSA-87 part of a SIWQ signature.
 pub const SIWQ_PQ_DOMAIN: &str = "qorechain-siwq-v1|";
+/// Default maximum age, in seconds, of a sign-in message that has no
+/// `expirationTime` (see [`VerifySiwqArgs::max_age_seconds`]).
+pub const SIWQ_DEFAULT_MAX_AGE_SECONDS: i64 = 600;
 const HEADER: &str = " wants you to sign in with your QoreChain account:";
 
 /// The fields of a sign-in message.
@@ -514,10 +517,15 @@ pub struct VerifySiwqArgs<'a> {
     pub now_ms: Option<i64>,
     /// Allowed clock skew for `issuedAt` and `notBefore`, in seconds. Default 60.
     pub clock_skew_seconds: i64,
+    /// Maximum age of a message without `expirationTime`, in seconds, counted
+    /// from `issuedAt`. Default [`SIWQ_DEFAULT_MAX_AGE_SECONDS`] (10 minutes);
+    /// must be positive. Not used when the message has `expirationTime`.
+    pub max_age_seconds: i64,
 }
 
 impl<'a> VerifySiwqArgs<'a> {
-    /// Defaults: PQ part required, no chain check, system clock, 60 s skew.
+    /// Defaults: PQ part required, no chain check, system clock, 60 s skew,
+    /// 10 minute maximum age for a message without `expirationTime`.
     pub fn new(
         message: &'a str,
         signature: &'a SiwqSignature,
@@ -535,6 +543,7 @@ impl<'a> VerifySiwqArgs<'a> {
             require_pq: true,
             now_ms: None,
             clock_skew_seconds: 60,
+            max_age_seconds: SIWQ_DEFAULT_MAX_AGE_SECONDS,
         }
     }
 }
@@ -558,6 +567,9 @@ fn decode_b64(s: &str) -> Option<Vec<u8>> {
 
 /// Verify a sign-in. Returns the parsed fields.
 ///
+/// A message without `expirationTime` is refused once it is older than
+/// `max_age_seconds` (default 10 minutes), counted from `issuedAt`.
+///
 /// A timestamp that matches the ISO form but names an impossible date fails
 /// closed: as expired (`expirationTime`) or not yet valid (`notBefore`, `issuedAt`).
 pub fn verify_siwq(args: &VerifySiwqArgs<'_>) -> Result<SiwqFields> {
@@ -579,6 +591,11 @@ pub fn verify_siwq(args: &VerifySiwqArgs<'_>) -> Result<SiwqFields> {
             )));
         }
     }
+    if args.max_age_seconds <= 0 {
+        return Err(Error::InvalidArgument(
+            "max_age_seconds must be positive".into(),
+        ));
+    }
     let now = match args.now_ms {
         Some(ms) => ms,
         None => system_now_ms()?,
@@ -597,8 +614,15 @@ pub fn verify_siwq(args: &VerifySiwqArgs<'_>) -> Result<SiwqFields> {
             ));
         }
     }
-    if parse_timestamp_ms(&fields.issued_at).is_none_or(|t| t > latest) {
+    let Some(issued) = parse_timestamp_ms(&fields.issued_at).filter(|t| *t <= latest) else {
         return Err(Error::SiwqNotYetValid("issuedAt is in the future".into()));
+    };
+    if fields.expiration_time.is_none()
+        && now.saturating_sub(issued) > args.max_age_seconds.saturating_mul(1000)
+    {
+        return Err(Error::SiwqExpired(
+            "the sign-in message has no expirationTime and is older than the maximum age".into(),
+        ));
     }
 
     let sig = args.signature;

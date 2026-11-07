@@ -362,7 +362,14 @@ type VerifySiwqOptions struct {
 	// ClockSkew is the allowed skew for issuedAt and notBefore. Zero means
 	// the default of 60 seconds; a negative value allows none.
 	ClockSkew time.Duration
+	// MaxAge is how long after issuedAt a message without expirationTime is
+	// accepted. Zero means the default of 10 minutes (SiwqDefaultMaxAge); a
+	// negative value is an error. Not used when the message has expirationTime.
+	MaxAge time.Duration
 }
+
+// SiwqDefaultMaxAge is the default VerifySiwqOptions.MaxAge.
+const SiwqDefaultMaxAge = 10 * time.Minute
 
 func parseISO(s string) (int64, error) {
 	t, err := time.Parse(time.RFC3339Nano, s)
@@ -372,11 +379,18 @@ func parseISO(s string) (int64, error) {
 	return t.UnixMilli(), nil
 }
 
-// VerifySiwq verifies a sign-in and returns its parsed fields.
+// VerifySiwq verifies a sign-in and returns its parsed fields. A message
+// without expirationTime is refused once it is older than opts.MaxAge.
 func VerifySiwq(opts VerifySiwqOptions) (SiwqFields, error) {
 	fields, err := ParseSiwqMessage(opts.Message)
 	if err != nil {
 		return SiwqFields{}, err
+	}
+	maxAge := opts.MaxAge
+	if maxAge == 0 {
+		maxAge = SiwqDefaultMaxAge
+	} else if maxAge < 0 {
+		return SiwqFields{}, errorf(CodeInvalidArgument, "MaxAge must be positive")
 	}
 	if fields.Domain != opts.Domain {
 		return SiwqFields{}, errorf(CodeSiwqDomainMismatch, "message is for %s, expected %s", fields.Domain, opts.Domain)
@@ -423,6 +437,9 @@ func VerifySiwq(opts VerifySiwqOptions) (SiwqFields, error) {
 	}
 	if issued > nowMs+skewMs {
 		return SiwqFields{}, errorf(CodeSiwqNotYetValid, "issuedAt is in the future")
+	}
+	if fields.ExpirationTime == "" && nowMs-issued > maxAge.Milliseconds() {
+		return SiwqFields{}, errorf(CodeSiwqExpired, "the sign-in message has no expirationTime and is older than the maximum age")
 	}
 
 	sig := opts.Signature

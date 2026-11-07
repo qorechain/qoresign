@@ -71,6 +71,7 @@ export {
   verifyProofOfPossession,
 } from "./registration.js";
 export {
+  SIWQ_DEFAULT_MAX_AGE_SECONDS,
   SIWQ_PQ_DOMAIN,
   adr36SignBytes,
   createSiwqMessage,

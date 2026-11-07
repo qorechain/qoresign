@@ -84,6 +84,8 @@ do {
 Byte fields are `Data`. Optional arguments default to the same values as the
 TypeScript package (v2 sign-bytes, deterministic ML-DSA-87, hybrid mode).
 `verifySiwq(... nowMs:)` takes Unix milliseconds; `nil` reads the system clock.
+A sign-in message without an expiration time is accepted for `maxAgeSeconds`
+after its issued-at time (default 600; pass a positive value to change it).
 
 ## Build locally
 

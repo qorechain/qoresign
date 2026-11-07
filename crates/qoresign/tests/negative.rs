@@ -541,6 +541,54 @@ fn siwq_checks() {
 }
 
 #[test]
+fn siwq_max_age() {
+    let k = keys();
+    let mut fields = siwq_fields(&k.address);
+    fields.expiration_time = None;
+    let msg = create_siwq_message(&fields).unwrap();
+    let sig = sign_siwq(&msg, &k.classical, Some(&k.pq), false).unwrap();
+    let pq = Some(k.pq.public_key.as_slice());
+    let at = |t: &'static str| move |a: &mut VerifySiwqArgs<'_>| a.now_ms = parse_timestamp_ms(t);
+    let code = |r: Result<SiwqFields>| r.unwrap_err().code();
+
+    // Without expirationTime the default maximum age is 10 minutes.
+    assert_eq!(SIWQ_DEFAULT_MAX_AGE_SECONDS, 600);
+    assert!(siwq_verify(&msg, &sig, pq, at("2026-10-27T10:10:00Z")).is_ok());
+    assert_eq!(
+        code(siwq_verify(&msg, &sig, pq, at("2026-10-27T10:10:00.001Z"))),
+        "SIWQ_EXPIRED"
+    );
+    // A caller-chosen maximum age.
+    assert!(siwq_verify(&msg, &sig, pq, |a| {
+        a.now_ms = parse_timestamp_ms("2026-10-27T10:59:00Z");
+        a.max_age_seconds = 3600;
+    })
+    .is_ok());
+    assert_eq!(
+        code(siwq_verify(&msg, &sig, pq, |a| {
+            a.now_ms = parse_timestamp_ms("2026-10-27T10:00:31Z");
+            a.max_age_seconds = 30;
+        })),
+        "SIWQ_EXPIRED"
+    );
+    for bad in [0, -1] {
+        assert_eq!(
+            code(siwq_verify(&msg, &sig, pq, |a| a.max_age_seconds = bad)),
+            "INVALID_ARGUMENT"
+        );
+    }
+
+    // With expirationTime the maximum age does not apply.
+    let with_exp = create_siwq_message(&siwq_fields(&k.address)).unwrap();
+    let with_exp_sig = sign_siwq(&with_exp, &k.classical, Some(&k.pq), false).unwrap();
+    assert!(siwq_verify(&with_exp, &with_exp_sig, pq, |a| {
+        a.now_ms = parse_timestamp_ms("2026-10-27T10:09:00Z");
+        a.max_age_seconds = 30;
+    })
+    .is_ok());
+}
+
+#[test]
 fn siwq_address_mismatch() {
     let k = keys();
     let eth = derive_classical_key(MNEMONIC, ClassicalKeyType::EthSecp256k1, 0).unwrap();

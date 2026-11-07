@@ -4136,9 +4136,11 @@ public func verifyProofOfPossession(chainId: String, account: String, publicKey:
 /**
  * Verify a sign-in and return its fields. `now_ms` is Unix milliseconds;
  * null reads the system clock. A classical-only sign-in is refused unless
- * `require_pq` is false.
+ * `require_pq` is false. A message without an expiration time is refused
+ * once it is older than `max_age_seconds` (default 600, must be positive),
+ * counted from its issued-at time.
  */
-public func verifySiwq(message: String, signature: SiwqSignature, domain: String, nonce: String, pqPublicKey: Data? = nil, chainId: String? = nil, requirePq: Bool = true, nowMs: Int64? = nil, clockSkewSeconds: Int64 = Int64(60))throws  -> SiwqFields  {
+public func verifySiwq(message: String, signature: SiwqSignature, domain: String, nonce: String, pqPublicKey: Data? = nil, chainId: String? = nil, requirePq: Bool = true, nowMs: Int64? = nil, clockSkewSeconds: Int64 = Int64(60), maxAgeSeconds: Int64 = Int64(600))throws  -> SiwqFields  {
     return try  FfiConverterTypeSiwqFields_lift(try rustCallWithError(FfiConverterTypeQoreSignError_lift) {
     uniffi_qoresign_ffi_fn_func_verify_siwq(
         FfiConverterString.lower(message),
@@ -4149,7 +4151,8 @@ public func verifySiwq(message: String, signature: SiwqSignature, domain: String
         FfiConverterOptionString.lower(chainId),
         FfiConverterBool.lower(requirePq),
         FfiConverterOptionInt64.lower(nowMs),
-        FfiConverterInt64.lower(clockSkewSeconds),$0
+        FfiConverterInt64.lower(clockSkewSeconds),
+        FfiConverterInt64.lower(maxAgeSeconds),$0
     )
 })
 }
@@ -4283,7 +4286,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_qoresign_ffi_checksum_func_verify_proof_of_possession() != 48696) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_qoresign_ffi_checksum_func_verify_siwq() != 61139) {
+    if (uniffi_qoresign_ffi_checksum_func_verify_siwq() != 40434) {
         return InitializationResult.apiChecksumMismatch
     }
 
