@@ -112,7 +112,7 @@ describe("sign-bytes version from the protocol feature switch", () => {
     ["a route that is not implemented (501)", { status: 501, body: {} }, "v1", true],
     ["an answer without a feature list", { status: 200, body: { features: "x" } }, "v1", true],
     ["an invalid enabled value", { status: 200, body: features(7) }, "v1", true],
-    ["a switch that is not listed", { status: 200, body: features() }, "v1", true],
+    ["a switch that is not listed (the list is authoritative)", { status: 200, body: features() }, "v1", false],
   ] as const)("%s", async (_name, feature, want, fallback) => {
     const calls: string[] = [];
     const v = await resolveSignBytesVersion({ rest: "https://r", chainId: "qorechain-diana", fetch: mockFetch(noPlans(feature), calls) });

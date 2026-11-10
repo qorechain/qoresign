@@ -229,7 +229,7 @@ func TestSignBytesVersionFromProtocolFeature(t *testing.T) {
 		{"unreadable answer falls back", reply{200, "not json"}, qoresign.SignBytesV1, true},
 		{"answer without a feature list falls back", reply{200, map[string]any{"features": "x"}}, qoresign.SignBytesV1, true},
 		{"invalid enabled value falls back", reply{200, features(7)}, qoresign.SignBytesV1, true},
-		{"switch not listed falls back", reply{200, features("")}, qoresign.SignBytesV1, true},
+		{"switch not listed means v1, the list is authoritative", reply{200, features("")}, qoresign.SignBytesV1, false},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			cl, calls := server(t, noPlans(c.feature))

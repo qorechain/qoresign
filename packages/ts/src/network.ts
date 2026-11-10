@@ -141,18 +141,18 @@ export async function fetchProtocolFeature(
 /**
  * The hybrid sign-bytes version the network verifies now.
  *
- * Reads the protocol feature switch {@link SIGN_BYTES_V2_FEATURE} first: v2
- * when it is enabled, v1 when it is listed but disabled. Only when that query
- * fails (no answer, a node that does not serve the route, an unreadable
- * answer) or does not list the switch does it fall back to the applied
- * upgrade plans: v2 once v3.1.98 or v3.2.0 is applied; before that v1 on the
+ * Reads the protocol feature switches first; they are authoritative when they
+ * can be read: v2 when {@link SIGN_BYTES_V2_FEATURE} is listed and enabled, v1
+ * otherwise (disabled or not listed). Only when that query fails (no answer, a
+ * node that does not serve the route, an unreadable answer) does it fall back
+ * to the applied upgrade plans: v2 once v3.1.98 or v3.2.0 is applied; before that v1 on the
  * networks that predate v2 (`qorechain-vladi`, `qorechain-diana`) and v2 on
  * any other chain.
  */
 export async function resolveSignBytesVersion(opts: RestOptions & { chainId: string }): Promise<SignBytesVersion> {
   try {
     const feature = await fetchProtocolFeature({ ...opts, name: SIGN_BYTES_V2_FEATURE });
-    if (feature.listed) return feature.enabled ? "v2" : "v1";
+    return feature.enabled ? "v2" : "v1";
   } catch (err) {
     if (!(err instanceof QoreSignError) || err.code !== "NETWORK_UNAVAILABLE") throw err;
   }

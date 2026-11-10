@@ -271,14 +271,15 @@ func (c *Client) FetchProtocolFeature(ctx context.Context, name string) (enabled
 // ResolveSignBytesVersion returns the hybrid sign-bytes version the network
 // verifies now.
 //
-// It first reads the protocol feature switch SignBytesV2Feature: v2 when it
-// is enabled, v1 when it is listed but disabled. Only when that query fails
-// (no answer, a node that does not serve the route, an unreadable answer) or
-// does not list the switch does it fall back to the applied upgrade plans:
+// It first reads the protocol feature switches, which are authoritative when
+// they can be read: v2 when SignBytesV2Feature is listed and enabled, v1
+// otherwise (disabled or not listed). Only when that query fails (no answer, a
+// node that does not serve the route, an unreadable answer) does it fall back
+// to the applied upgrade plans:
 // v2 once v3.1.98 or v3.2.0 is applied; before that v1 on the networks that
 // predate v2 (qorechain-vladi, qorechain-diana) and v2 on any other chain.
 func (c *Client) ResolveSignBytesVersion(ctx context.Context, chainID string) (qoresign.SignBytesVersion, error) {
-	if enabled, listed, err := c.FetchProtocolFeature(ctx, SignBytesV2Feature); err == nil && listed {
+	if enabled, _, err := c.FetchProtocolFeature(ctx, SignBytesV2Feature); err == nil {
 		if enabled {
 			return qoresign.SignBytesV2, nil
 		}
