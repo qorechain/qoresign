@@ -15,4 +15,6 @@ Every key is derived from the public BIP-39 test mnemonic (`abandon ... about`).
 | `message` | arbitrary message signing: data, ADR-36 and ML-DSA-87 sign-bytes, signature (`spec/message-signing-v1.md`) |
 | `siwq` | sign-in fields, rendered message, ADR-36 and ML-DSA-87 sign-bytes, signature, and a time at which it verifies (`spec/siwq-v1.md`) |
 
+`siwq-timestamps-v1.json` lists SIWQ timestamps that create, parse, sign and verify must accept (with their Unix milliseconds) and ones they must refuse (`spec/siwq-v1.md`, Timestamps). The Rust, Go and TypeScript suites check it.
+
 All byte strings are lowercase hex. ML-DSA-87 signatures are deterministic (FIPS 204, `rnd` = 32 zero bytes); secp256k1 signatures use RFC 6979 and low-S.

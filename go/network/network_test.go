@@ -68,6 +68,24 @@ func server(t *testing.T, rt route) (*network.Client, *[]string) {
 	return c, &calls
 }
 
+// features answers the protocol feature query with the sign-bytes v2 switch
+// in the given state ("" leaves it out of the list).
+func features(enabled any) map[string]any {
+	list := []any{map[string]any{"name": "pqc-time-proof", "enabled": true, "known": true, "staged": false}}
+	if enabled != "" {
+		list = append(list, map[string]any{"name": network.SignBytesV2Feature, "enabled": enabled, "known": true, "staged": false})
+	}
+	return map[string]any{"features": list, "height": "4200"}
+}
+
+// v2Route is accountRoute on a network whose sign-bytes v2 switch is on.
+func v2Route(r *http.Request, body string) reply {
+	if r.URL.Path == network.ProtocolFeaturesPath {
+		return reply{200, features(true)}
+	}
+	return accountRoute(r, body)
+}
+
 func accountRoute(r *http.Request, _ string) reply {
 	if strings.HasPrefix(r.URL.Path, "/qorechain/pqc/v1/account/") {
 		return reply{200, map[string]any{
@@ -162,8 +180,10 @@ func TestSignBytesVersion(t *testing.T) {
 		if got := must(cl.ResolveSignBytesVersion(ctx, c.chain)); got != c.want {
 			t.Errorf("%s at %s: %s", c.chain, c.height, got)
 		}
-		if len(*calls) != 2 {
-			t.Errorf("expected one query per upgrade name, got %v", *calls)
+		// The protocol feature query is answered without a feature list, so
+		// the version comes from the applied plans.
+		if len(*calls) != 3 || (*calls)[0] != "GET "+network.ProtocolFeaturesPath {
+			t.Errorf("expected the feature query, then one query per upgrade name, got %v", *calls)
 		}
 	}
 	// testnet took the switch as v3.1.98
@@ -180,6 +200,73 @@ func TestSignBytesVersion(t *testing.T) {
 	if _, err := cl.ResolveSignBytesVersion(ctx, "qorechain-diana"); code(err) != qoresign.CodeNetworkUnavailable {
 		t.Error(err)
 	}
+}
+
+func TestSignBytesVersionFromProtocolFeature(t *testing.T) {
+	// No upgrade plan applied, as on a fresh network that reuses a chain id.
+	noPlans := func(feature reply) route {
+		return func(r *http.Request, _ string) reply {
+			if r.URL.Path == network.ProtocolFeaturesPath {
+				return feature
+			}
+			if strings.Contains(r.URL.Path, "applied_plan") {
+				return reply{200, map[string]any{"plan": nil}}
+			}
+			return reply{404, map[string]any{}}
+		}
+	}
+	for _, c := range []struct {
+		name     string
+		feature  reply
+		want     qoresign.SignBytesVersion
+		fallback bool
+	}{
+		{"enabled switch on a legacy chain id with no plan applied", reply{200, features(true)}, qoresign.SignBytesV2, false},
+		{"enabled switch spelled as a string", reply{200, features("true")}, qoresign.SignBytesV2, false},
+		{"listed but disabled switch", reply{200, features(false)}, qoresign.SignBytesV1, false},
+		{"route not served (404) falls back to the applied plans", reply{404, map[string]any{"code": 5, "message": "Not Implemented"}}, qoresign.SignBytesV1, true},
+		{"route not implemented (501) falls back", reply{501, map[string]any{}}, qoresign.SignBytesV1, true},
+		{"unreadable answer falls back", reply{200, "not json"}, qoresign.SignBytesV1, true},
+		{"answer without a feature list falls back", reply{200, map[string]any{"features": "x"}}, qoresign.SignBytesV1, true},
+		{"invalid enabled value falls back", reply{200, features(7)}, qoresign.SignBytesV1, true},
+		{"switch not listed falls back", reply{200, features("")}, qoresign.SignBytesV1, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			cl, calls := server(t, noPlans(c.feature))
+			if got := must(cl.ResolveSignBytesVersion(ctx, "qorechain-diana")); got != c.want {
+				t.Errorf("got %s, want %s", got, c.want)
+			}
+			want := []string{"GET " + network.ProtocolFeaturesPath}
+			if c.fallback {
+				want = append(want, "GET /cosmos/upgrade/v1beta1/applied_plan/v3.2.0", "GET /cosmos/upgrade/v1beta1/applied_plan/v3.1.98")
+			}
+			if !reflect.DeepEqual(*calls, want) {
+				t.Errorf("calls %v, want %v", *calls, want)
+			}
+		})
+	}
+
+	t.Run("a fallback still reads every applied plan", func(t *testing.T) {
+		cl, _ := server(t, func(r *http.Request, _ string) reply {
+			if strings.HasSuffix(r.URL.Path, "/v3.2.0") {
+				return reply{200, map[string]any{"height": "2981742"}}
+			}
+			if strings.Contains(r.URL.Path, "applied_plan") {
+				return reply{200, map[string]any{"plan": nil}}
+			}
+			return reply{404, map[string]any{}}
+		})
+		if got := must(cl.ResolveSignBytesVersion(ctx, "qorechain-vladi")); got != qoresign.SignBytesV2 {
+			t.Error(got)
+		}
+	})
+
+	t.Run("an unreachable node is an error", func(t *testing.T) {
+		cl := network.NewClient("http://127.0.0.1:1")
+		if _, err := cl.ResolveSignBytesVersion(ctx, "qorechain-diana"); code(err) != qoresign.CodeNetworkUnavailable {
+			t.Error(err)
+		}
+	})
 }
 
 func TestSimulation(t *testing.T) {
@@ -358,7 +445,7 @@ func TestChecksAgainstRegisteredKey(t *testing.T) {
 	args := network.AssertPqLayerArgs{ChainID: "qorechain-diana", Signer: address, BodyBytes: layered, AuthInfoBytes: auth}
 
 	t.Run("accepts a layer made with the registered key and refuses a missing one", func(t *testing.T) {
-		c, _ := server(t, accountRoute)
+		c, _ := server(t, v2Route)
 		if ok := must(c.AssertPqLayerMatchesRegisteredKey(ctx, args)); !ok.Valid {
 			t.Fatal(ok)
 		}
@@ -382,6 +469,59 @@ func TestChecksAgainstRegisteredKey(t *testing.T) {
 		none, _ := server(t, func(*http.Request, string) reply { return reply{200, map[string]any{"found": false}} })
 		if _, err := none.AssertPqLayerMatchesRegisteredKey(ctx, args); code(err) != qoresign.CodeKeyNotRegistered {
 			t.Fatal(err)
+		}
+	})
+
+	t.Run("checks only the version the network verifies", func(t *testing.T) {
+		v1 := args
+		v1.BodyBytes = must(qoresign.SignPqLayer(qoresign.SignPqLayerArgs{
+			ChainID: "qorechain-diana", BodyBytes: body, AuthInfoBytes: auth, PqKey: pqKey, SignBytesVersion: qoresign.SignBytesV1,
+		})).BodyBytes
+		c, _ := server(t, v2Route)
+		_, err := c.AssertPqLayerMatchesRegisteredKey(ctx, v1)
+		var e *qoresign.Error
+		if !errors.As(err, &e) || e.Code != qoresign.CodePqSignatureInvalid || e.Details["reason"] != "invalid_signature" {
+			t.Fatalf("a v1 layer on a v2 network: %v", err)
+		}
+
+		legacy := v1
+		legacy.AllowLegacyEither = true
+		if r := must(c.AssertPqLayerMatchesRegisteredKey(ctx, legacy)); !r.Valid || r.SignBytesVersion != qoresign.SignBytesV1 {
+			t.Fatalf("legacy option: %+v", r)
+		}
+
+		// An explicit version is used as given, without asking the network.
+		explicit := v1
+		explicit.SignBytesVersion = qoresign.SignBytesV1
+		ec, calls := server(t, accountRoute)
+		if r := must(ec.AssertPqLayerMatchesRegisteredKey(ctx, explicit)); !r.Valid || r.SignBytesVersion != qoresign.SignBytesV1 {
+			t.Fatalf("explicit v1: %+v", r)
+		}
+		for _, call := range *calls {
+			if !strings.Contains(call, "/qorechain/pqc/v1/account/") {
+				t.Fatalf("unexpected query %s", call)
+			}
+		}
+		explicit.SignBytesVersion = qoresign.SignBytesV2
+		if _, err := ec.AssertPqLayerMatchesRegisteredKey(ctx, explicit); code(err) != qoresign.CodePqSignatureInvalid {
+			t.Fatal(err)
+		}
+
+		either := v1
+		either.SignBytesVersion = qoresign.SignBytesEither
+		if _, err := c.AssertPqLayerMatchesRegisteredKey(ctx, either); code(err) != qoresign.CodeInvalidArgument {
+			t.Fatal(err)
+		}
+
+		// A network that verifies v1 (switch listed but off) accepts the v1 layer.
+		off, _ := server(t, func(r *http.Request, b string) reply {
+			if r.URL.Path == network.ProtocolFeaturesPath {
+				return reply{200, features(false)}
+			}
+			return accountRoute(r, b)
+		})
+		if r := must(off.AssertPqLayerMatchesRegisteredKey(ctx, v1)); !r.Valid || r.SignBytesVersion != qoresign.SignBytesV1 {
+			t.Fatalf("v1 network: %+v", r)
 		}
 	})
 

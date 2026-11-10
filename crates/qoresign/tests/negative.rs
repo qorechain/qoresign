@@ -683,14 +683,25 @@ fn siwq_canonical_text() {
 }
 
 #[test]
-fn siwq_impossible_dates_fail_closed() {
+fn siwq_impossible_dates_are_malformed() {
     let k = keys();
-    let mut f = siwq_fields(&k.address);
-    f.expiration_time = Some("2026-02-30T10:00:00Z".into());
-    let msg = create_siwq_message(&f).unwrap();
-    let sig = sign_siwq(&msg, &k.classical, Some(&k.pq), false).unwrap();
-    let err = siwq_verify(&msg, &sig, Some(&k.pq.public_key), |_| {}).unwrap_err();
-    assert_eq!(err.code(), "SIWQ_EXPIRED");
+    let good = create_siwq_message(&siwq_fields(&k.address)).unwrap();
+    let sig = sign_siwq(&good, &k.classical, Some(&k.pq), false).unwrap();
+    for bad in ["2026-02-30T10:00:00Z", "2026-10-27T24:00:00Z"] {
+        let mut f = siwq_fields(&k.address);
+        f.expiration_time = Some(bad.into());
+        assert_eq!(
+            create_siwq_message(&f).unwrap_err().code(),
+            "SIWQ_MALFORMED"
+        );
+        let msg = good.replace(
+            "Expiration Time: 2026-10-27T10:10:00Z",
+            &format!("Expiration Time: {bad}"),
+        );
+        assert_ne!(msg, good);
+        let err = siwq_verify(&msg, &sig, Some(&k.pq.public_key), |_| {}).unwrap_err();
+        assert_eq!(err.code(), "SIWQ_MALFORMED");
+    }
 }
 
 #[test]
@@ -708,8 +719,10 @@ fn timestamps() {
         parse_timestamp_ms("2024-02-29T00:00:00Z"),
         Some(1_709_164_800_000)
     );
-    assert_eq!(parse_timestamp_ms("1970-01-01T24:00:00Z"), Some(86_400_000));
     for bad in [
+        "1970-01-01T24:00:00Z",
+        "2026-10-27T10:00:60Z",
+        "2026-10-27T10:00:00-24:00",
         "2023-02-29T00:00:00Z",
         "2026-13-01T00:00:00Z",
         "2026-10-27T10:60:00Z",

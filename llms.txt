@@ -25,10 +25,10 @@ Networks: mainnet chain id qorechain-vladi (REST https://api.qore.host), testnet
 - deriveClassicalKey, deriveCanonicalPqKey, deriveHdPqKey, addressFromPublicKey, parseAddress
 - signHybrid, signPqLayer, hybridSignBytes, verifyHybridTx, verifyPqLayer
 - buildRegisterPqKeyMessage, signProofOfPossession, verifyProofOfPossession
-- createSiwqMessage, parseSiwqMessage, signSiwq, verifySiwq
+- createSiwqMessage, parseSiwqMessage, parseSiwqTimestamp, signSiwq, verifySiwq
 - signMessage, verifyMessage, messagePqSignBytes, RESERVED_PQ_DOMAINS
 - assertHybridLane, decideLane, evaluateLayerState
-- @qorechain/qoresign/network: fetchPqKeyStatus, resolveSignBytesVersion, simulateTx, broadcastTx, submitWithSignBytesFallback, assertPqLayerMatchesRegisteredKey, verifySiwqWithChain, verifyMessageWithChain
+- @qorechain/qoresign/network: fetchPqKeyStatus, fetchProtocolFeature, resolveSignBytesVersion, simulateTx, broadcastTx, submitWithSignBytesFallback, assertPqLayerMatchesRegisteredKey, verifySiwqWithChain, verifyMessageWithChain
 - Errors: QoreSignError with a stable `code` (e.g. PQ_SIGNATURE_INVALID, KEY_NOT_REGISTERED, LANE_NOT_AVAILABLE, SIMULATION_FAILED)
 
 ## Other packages

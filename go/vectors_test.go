@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -354,4 +355,85 @@ func TestVectors(t *testing.T) {
 			t.Errorf("verified address %s", fields.Address)
 		}
 	})
+}
+
+func TestSiwqTimestampVectors(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "vectors", "siwq-timestamps-v1.json"))
+	if err != nil {
+		t.Fatalf("read timestamp vectors: %v", err)
+	}
+	var tv struct {
+		Format string `json:"format"`
+		Valid  []struct {
+			Timestamp string `json:"timestamp"`
+			UnixMs    int64  `json:"unixMs"`
+		} `json:"valid"`
+		Invalid []string `json:"invalid"`
+	}
+	if err := json.Unmarshal(raw, &tv); err != nil {
+		t.Fatalf("parse timestamp vectors: %v", err)
+	}
+	if tv.Format != "qoresign-siwq-timestamps-v1" || len(tv.Valid) == 0 || len(tv.Invalid) == 0 {
+		t.Fatalf("unexpected timestamp vectors: %q", tv.Format)
+	}
+	v := loadVectors(t)
+	base := v.Siwq.Fields
+	var sig qoresign.SiwqSignature
+	if err := json.Unmarshal(v.Siwq.Signature, &sig); err != nil {
+		t.Fatal(err)
+	}
+	pq := testPq
+	issuedLine := "Issued At: " + base.IssuedAt
+	if !strings.Contains(v.Siwq.Message, issuedLine) {
+		t.Fatal("vector message has no Issued At line")
+	}
+
+	for _, c := range tv.Valid {
+		got, ok := qoresign.ParseSiwqTimestamp(c.Timestamp)
+		if !ok || got != c.UnixMs {
+			t.Errorf("%s: got %d %v, want %d", c.Timestamp, got, ok, c.UnixMs)
+		}
+		f := base
+		f.IssuedAt, f.ExpirationTime, f.NotBefore = c.Timestamp, c.Timestamp, c.Timestamp
+		msg, err := qoresign.CreateSiwqMessage(f)
+		if err != nil {
+			t.Errorf("%s: create: %v", c.Timestamp, err)
+			continue
+		}
+		if _, err := qoresign.ParseSiwqMessage(msg); err != nil {
+			t.Errorf("%s: parse: %v", c.Timestamp, err)
+		}
+		if _, err := qoresign.SignSiwq(qoresign.SignSiwqArgs{Message: msg, ClassicalKey: testClassical, PqKey: &pq}); err != nil {
+			t.Errorf("%s: sign: %v", c.Timestamp, err)
+		}
+	}
+
+	for _, ts := range tv.Invalid {
+		if _, ok := qoresign.ParseSiwqTimestamp(ts); ok {
+			t.Errorf("%s: accepted", ts)
+		}
+		issued, exp, nbf := base, base, base
+		issued.IssuedAt = ts
+		exp.ExpirationTime = ts
+		nbf.ExpirationTime, nbf.NotBefore = "", ts
+		for _, f := range []qoresign.SiwqFields{issued, exp, nbf} {
+			if _, err := qoresign.CreateSiwqMessage(f); errCode(err) != qoresign.CodeSiwqMalformed {
+				t.Errorf("%s: create: %v", ts, err)
+			}
+		}
+		msg := strings.Replace(v.Siwq.Message, issuedLine, "Issued At: "+ts, 1)
+		if _, err := qoresign.ParseSiwqMessage(msg); errCode(err) != qoresign.CodeSiwqMalformed {
+			t.Errorf("%s: parse: %v", ts, err)
+		}
+		if _, err := qoresign.SignSiwq(qoresign.SignSiwqArgs{Message: msg, ClassicalKey: testClassical, PqKey: &pq}); errCode(err) != qoresign.CodeSiwqMalformed {
+			t.Errorf("%s: sign: %v", ts, err)
+		}
+		_, err := qoresign.VerifySiwq(qoresign.VerifySiwqOptions{
+			Message: msg, Signature: sig, Domain: "app.example.com", Nonce: "a1b2c3d4e5",
+			PqPublicKey: pq.PublicKey, Now: time.Date(2026, 10, 27, 10, 0, 30, 0, time.UTC),
+		})
+		if errCode(err) != qoresign.CodeSiwqMalformed {
+			t.Errorf("%s: verify: %v", ts, err)
+		}
+	}
 }

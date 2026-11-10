@@ -9,6 +9,7 @@ package qoresign
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -77,8 +78,77 @@ var (
 	schemeRe  = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+.-]*$`)
 	chainIDRe = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 	nonceRe   = regexp.MustCompile(`^[A-Za-z0-9]{8,}$`)
-	isoRe     = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$`)
+	isoRe     = regexp.MustCompile(`^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(?:Z|([+-])(\d{2}):(\d{2}))$`)
 )
+
+func daysFromCivil(y, m, d int64) int64 {
+	if m <= 2 {
+		y--
+	}
+	era := y
+	if y < 0 {
+		era = y - 399
+	}
+	era /= 400
+	yoe := y - era*400
+	mp := (m + 9) % 12
+	doy := (153*mp+2)/5 + d - 1
+	doe := yoe*365 + yoe/4 - yoe/100 + doy
+	return era*146_097 + doe - 719_468
+}
+
+// ParseSiwqTimestamp returns the Unix milliseconds of a timestamp in the SIWQ
+// grammar, YYYY-MM-DDTHH:MM:SS[.fraction](Z|+HH:MM|-HH:MM), and false when s
+// is not one: month 01-12, day valid for the month and year, hour 00-23,
+// minute 00-59, second 00-59 (no leap second), offset hour 00-23 and offset
+// minute 00-59. Digits past milliseconds are dropped. Create, parse, sign and
+// verify all use it.
+func ParseSiwqTimestamp(s string) (int64, bool) {
+	m := isoRe.FindStringSubmatch(s)
+	if m == nil {
+		return 0, false
+	}
+	n := func(i int) int64 {
+		v, _ := strconv.ParseInt(m[i], 10, 64)
+		return v
+	}
+	year, month, day, hour, minute, second := n(1), n(2), n(3), n(4), n(5), n(6)
+	if month < 1 || month > 12 || hour > 23 || minute > 59 || second > 59 {
+		return 0, false
+	}
+	leap := (year%4 == 0 && year%100 != 0) || year%400 == 0
+	monthDays := [12]int64{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+	if leap {
+		monthDays[1] = 29
+	}
+	if day < 1 || day > monthDays[month-1] {
+		return 0, false
+	}
+	var offset int64
+	if m[8] != "" {
+		offH, offM := n(9), n(10)
+		if offH > 23 || offM > 59 {
+			return 0, false
+		}
+		offset = offH*3600 + offM*60
+		if m[8] == "-" {
+			offset = -offset
+		}
+	}
+	var ms int64
+	for i, scale := range []int64{100, 10, 1} {
+		if i < len(m[7]) {
+			ms += int64(m[7][i]-'0') * scale
+		}
+	}
+	secs := daysFromCivil(year, month, day)*86_400 + hour*3600 + minute*60 + second - offset
+	return secs*1000 + ms, true
+}
+
+func isSiwqTimestamp(s string) bool {
+	_, ok := ParseSiwqTimestamp(s)
+	return ok
+}
 
 func validateSiwq(f SiwqFields) error {
 	if f.Domain == "" || strings.IndexFunc(f.Domain, func(r rune) bool { return r == '/' || isJSSpace(r) }) >= 0 {
@@ -100,9 +170,9 @@ func validateSiwq(f SiwqFields) error {
 		{f.Version == "" || f.Version == "1", "version must be 1"},
 		{chainIDRe.MatchString(f.ChainID), "invalid chain id"},
 		{nonceRe.MatchString(f.Nonce), "nonce must be at least 8 alphanumeric characters"},
-		{isoRe.MatchString(f.IssuedAt), "issuedAt must be ISO 8601"},
-		{f.ExpirationTime == "" || isoRe.MatchString(f.ExpirationTime), "expirationTime must be ISO 8601"},
-		{f.NotBefore == "" || isoRe.MatchString(f.NotBefore), "notBefore must be ISO 8601"},
+		{isSiwqTimestamp(f.IssuedAt), "issuedAt must be ISO 8601"},
+		{f.ExpirationTime == "" || isSiwqTimestamp(f.ExpirationTime), "expirationTime must be ISO 8601"},
+		{f.NotBefore == "" || isSiwqTimestamp(f.NotBefore), "notBefore must be ISO 8601"},
 		{!strings.Contains(f.RequestID, "\n"), "requestId must be a single line"},
 	}
 	for _, c := range checks {
@@ -372,11 +442,11 @@ type VerifySiwqOptions struct {
 const SiwqDefaultMaxAge = 10 * time.Minute
 
 func parseISO(s string) (int64, error) {
-	t, err := time.Parse(time.RFC3339Nano, s)
-	if err != nil {
+	ms, ok := ParseSiwqTimestamp(s)
+	if !ok {
 		return 0, errorf(CodeSiwqMalformed, "invalid timestamp %q", s)
 	}
-	return t.UnixMilli(), nil
+	return ms, nil
 }
 
 // VerifySiwq verifies a sign-in and returns its parsed fields. A message

@@ -334,3 +334,87 @@ fn message() {
         verify_message(&args).unwrap();
     }
 }
+
+#[test]
+fn siwq_timestamps() {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../vectors/siwq-timestamps-v1.json"
+    );
+    let text = std::fs::read_to_string(path).expect("read vectors/siwq-timestamps-v1.json");
+    let t: Value = serde_json::from_str(&text).expect("parse timestamp vectors");
+    let c = ctx();
+    let q = &c.v["siwq"];
+    let base: SiwqFields = serde_json::from_value(q["fields"].clone()).unwrap();
+    let message = s(q, "message");
+    let signature: SiwqSignature = serde_json::from_value(q["signature"].clone()).unwrap();
+    let issued_line = format!("Issued At: {}", base.issued_at);
+    assert!(message.contains(&issued_line));
+
+    let valid = t["valid"].as_array().unwrap();
+    assert!(!valid.is_empty());
+    for case in valid {
+        let ts = s(case, "timestamp");
+        assert_eq!(parse_timestamp_ms(ts), case["unixMs"].as_i64(), "{ts}");
+        let fields = SiwqFields {
+            issued_at: ts.to_owned(),
+            expiration_time: Some(ts.to_owned()),
+            not_before: Some(ts.to_owned()),
+            ..base.clone()
+        };
+        let msg = create_siwq_message(&fields).unwrap_or_else(|e| panic!("{ts}: {e}"));
+        parse_siwq_message(&msg).unwrap_or_else(|e| panic!("{ts}: {e}"));
+        sign_siwq(&msg, &c.classical, Some(&c.pq), false).unwrap_or_else(|e| panic!("{ts}: {e}"));
+    }
+
+    let invalid = t["invalid"].as_array().unwrap();
+    assert!(!invalid.is_empty());
+    for case in invalid {
+        let ts = case.as_str().unwrap();
+        assert_eq!(parse_timestamp_ms(ts), None, "{ts}");
+        for f in [
+            SiwqFields {
+                issued_at: ts.to_owned(),
+                ..base.clone()
+            },
+            SiwqFields {
+                expiration_time: Some(ts.to_owned()),
+                ..base.clone()
+            },
+            SiwqFields {
+                expiration_time: None,
+                not_before: Some(ts.to_owned()),
+                ..base.clone()
+            },
+        ] {
+            let err = create_siwq_message(&f).unwrap_err();
+            assert_eq!(err.code(), "SIWQ_MALFORMED", "{ts}");
+        }
+        let msg = message.replace(&issued_line, &format!("Issued At: {ts}"));
+        assert_eq!(
+            parse_siwq_message(&msg).unwrap_err().code(),
+            "SIWQ_MALFORMED",
+            "{ts}"
+        );
+        assert_eq!(
+            sign_siwq(&msg, &c.classical, Some(&c.pq), false)
+                .unwrap_err()
+                .code(),
+            "SIWQ_MALFORMED",
+            "{ts}"
+        );
+        let mut args = VerifySiwqArgs::new(
+            &msg,
+            &signature,
+            "app.example.com",
+            "a1b2c3d4e5",
+            Some(&c.pq.public_key),
+        );
+        args.now_ms = parse_timestamp_ms("2026-10-27T10:00:30Z");
+        assert_eq!(
+            verify_siwq(&args).unwrap_err().code(),
+            "SIWQ_MALFORMED",
+            "{ts}"
+        );
+    }
+}

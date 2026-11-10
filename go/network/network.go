@@ -207,11 +207,83 @@ func (c *Client) FetchAppliedPlanHeight(ctx context.Context, name string) (int64
 	return h, nil
 }
 
+// ProtocolFeaturesPath is the REST route of the network's protocol feature switches.
+const ProtocolFeaturesPath = "/qorechain/pqc/v1/protocol_features"
+
+// SignBytesV2Feature is the protocol feature switch that makes the network
+// verify v2 hybrid sign-bytes.
+const SignBytesV2Feature = "pqc-sign-bytes-v2"
+
+// readBool reads a JSON boolean, or the strings "true" / "false"; an absent
+// or null value is false. ok is false for anything else.
+func readBool(v any) (value, ok bool) {
+	switch x := v.(type) {
+	case nil:
+		return false, true
+	case bool:
+		return x, true
+	case string:
+		switch strings.TrimSpace(x) {
+		case "", "false":
+			return false, true
+		case "true":
+			return true, true
+		}
+	}
+	return false, false
+}
+
+// FetchProtocolFeature reads ProtocolFeaturesPath and reports whether the
+// switch name is listed and, if so, whether it is enabled. It returns an
+// error when the network cannot be asked or does not serve the route (nodes
+// before v3.2.4), or when the answer cannot be read.
+func (c *Client) FetchProtocolFeature(ctx context.Context, name string) (enabled, listed bool, err error) {
+	res, err := c.get(ctx, ProtocolFeaturesPath)
+	if err != nil {
+		return false, false, err
+	}
+	if !res.ok() {
+		return false, false, unavailable(fmt.Sprintf("could not read the protocol features (HTTP %d)", res.status), nil)
+	}
+	list, ok := res.body["features"].([]any)
+	if !ok {
+		return false, false, unavailable("the protocol features answer has no feature list", nil)
+	}
+	for _, item := range list {
+		m, ok := item.(map[string]any)
+		if !ok {
+			return false, false, unavailable("the protocol features answer has an invalid entry", nil)
+		}
+		n, _ := asString(m["name"])
+		if strings.TrimSpace(n) != name {
+			continue
+		}
+		on, ok := readBool(m["enabled"])
+		if !ok {
+			return false, false, unavailable("the protocol feature "+name+" has an invalid enabled value", nil)
+		}
+		listed = true
+		enabled = enabled || on
+	}
+	return enabled, listed, nil
+}
+
 // ResolveSignBytesVersion returns the hybrid sign-bytes version the network
-// verifies now: v2 once v3.1.98 or v3.2.0 is applied; before that v1 on the
-// networks that predate v2 (qorechain-vladi, qorechain-diana) and v2 on any
-// other chain.
+// verifies now.
+//
+// It first reads the protocol feature switch SignBytesV2Feature: v2 when it
+// is enabled, v1 when it is listed but disabled. Only when that query fails
+// (no answer, a node that does not serve the route, an unreadable answer) or
+// does not list the switch does it fall back to the applied upgrade plans:
+// v2 once v3.1.98 or v3.2.0 is applied; before that v1 on the networks that
+// predate v2 (qorechain-vladi, qorechain-diana) and v2 on any other chain.
 func (c *Client) ResolveSignBytesVersion(ctx context.Context, chainID string) (qoresign.SignBytesVersion, error) {
+	if enabled, listed, err := c.FetchProtocolFeature(ctx, SignBytesV2Feature); err == nil && listed {
+		if enabled {
+			return qoresign.SignBytesV2, nil
+		}
+		return qoresign.SignBytesV1, nil
+	}
 	applied := map[string]int64{}
 	for _, name := range pqc.SignBytesV2Upgrades {
 		h, err := c.FetchAppliedPlanHeight(ctx, name)
@@ -232,13 +304,35 @@ type AssertPqLayerArgs struct {
 	Signer        string
 	BodyBytes     []byte
 	AuthInfoBytes []byte
+	// SignBytesVersion is the one version the layer is checked against.
+	// Empty resolves the version the network verifies now
+	// (ResolveSignBytesVersion). SignBytesEither is refused here; see
+	// AllowLegacyEither.
+	SignBytesVersion qoresign.SignBytesVersion
+	// AllowLegacyEither accepts a layer over v1 or v2 sign-bytes, whatever the
+	// network verifies. For diagnostics only, never for trust decisions: v1
+	// sign-bytes are not bound to a chain id, and the network accepts exactly
+	// one version.
+	AllowLegacyEither bool
 }
 
 // AssertPqLayerMatchesRegisteredKey checks a dApp-prepared body's ML-DSA-87
-// layer against the key the signer has registered on chain, accepting v1 or
-// v2 sign-bytes. It fails when the layer is missing, malformed or invalid,
-// when the account has no key, or when the key cannot be read.
+// layer against the key the signer has registered on chain, over the one
+// sign-bytes version the network verifies (or args.SignBytesVersion). It
+// fails when the layer is missing, malformed or invalid, when the account has
+// no key, or when the key or the version cannot be read.
 func (c *Client) AssertPqLayerMatchesRegisteredKey(ctx context.Context, args AssertPqLayerArgs) (qoresign.PqLayerResult, error) {
+	version := args.SignBytesVersion
+	switch {
+	case args.AllowLegacyEither:
+		version = qoresign.SignBytesEither
+	case version == qoresign.SignBytesEither:
+		return qoresign.PqLayerResult{}, qoresign.NewError(qoresign.CodeInvalidArgument,
+			"SignBytesEither needs AllowLegacyEither (diagnostics only)", nil)
+	case version != "" && version != qoresign.SignBytesV1 && version != qoresign.SignBytesV2:
+		return qoresign.PqLayerResult{}, qoresign.NewError(qoresign.CodeInvalidArgument,
+			fmt.Sprintf("unknown sign-bytes version %q", version), nil)
+	}
 	status, err := c.FetchPqKeyStatus(ctx, args.Signer)
 	if err != nil {
 		return qoresign.PqLayerResult{}, err
@@ -247,12 +341,17 @@ func (c *Client) AssertPqLayerMatchesRegisteredKey(ctx context.Context, args Ass
 		return qoresign.PqLayerResult{}, qoresign.NewError(qoresign.CodeKeyNotRegistered,
 			args.Signer+" has no ML-DSA-87 key on the network", nil)
 	}
+	if version == "" {
+		if version, err = c.ResolveSignBytesVersion(ctx, args.ChainID); err != nil {
+			return qoresign.PqLayerResult{}, err
+		}
+	}
 	result, err := qoresign.VerifyPqLayer(qoresign.VerifyPqLayerArgs{
 		ChainID:          args.ChainID,
 		BodyBytes:        args.BodyBytes,
 		AuthInfoBytes:    args.AuthInfoBytes,
 		PqPublicKey:      status.PublicKey,
-		SignBytesVersion: qoresign.SignBytesEither,
+		SignBytesVersion: version,
 	})
 	if err != nil {
 		return qoresign.PqLayerResult{}, err

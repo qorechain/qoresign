@@ -6,7 +6,8 @@
 import { fromBase64, toBase64 } from "./bytes.js";
 import { QoreSignError } from "./errors.js";
 import { addressFromPublicKey, type ClassicalKeyType } from "./keys.js";
-import { fetchPqKeyStatus, type FetchLike, type RestOptions } from "./network.js";
+import { pqLayerVersionOption, type PqLayerVersionOptions } from "./layer-version.js";
+import { fetchPqKeyStatus, resolveSignBytesVersion, type FetchLike, type RestOptions } from "./network.js";
 import { decodeAny, decodeString, decodeTxRaw, encodeSignDoc, readFields, WIRE_LEN, WIRE_VARINT } from "./proto.js";
 import { classicalVerify, pqcLayers } from "./sign.js";
 import { verifyPqLayer, type PqLayerResult } from "./verify.js";
@@ -45,7 +46,10 @@ export interface InspectedTransaction {
     present: boolean;
     count: number;
     algorithmId?: number;
-    /** Verified against the key the signer has registered now (a later rotation makes this false). */
+    /**
+     * Verified against the key the signer has registered now (a later rotation makes this false),
+     * over the sign-bytes version the network verifies now unless another one was asked for.
+     */
     verified?: boolean;
     signBytesVersion?: PqLayerResult["signBytesVersion"];
     reason?: string;
@@ -136,11 +140,17 @@ async function fetchTxBytes(f: FetchLike, opts: { rest: string; rpc?: string; tx
  * state of its ML-DSA-87 layer and its security tier. Returns `undefined`
  * when the network does not know the hash. Pass `rpc` to read the exact
  * committed bytes from an RPC node; otherwise the REST gateway re-encodes them.
+ *
+ * The layer is checked over the one sign-bytes version the network verifies
+ * now ({@link resolveSignBytesVersion}). For a transaction committed before
+ * the network moved to v2, pass `signBytesVersion: "v1"`. `allowLegacyEither`
+ * accepts either version and is for diagnostics only, never for trust decisions.
  */
 export async function inspectTransaction(
-  opts: RestOptions & { txhash: string; chainId: string; rpc?: string },
+  opts: RestOptions & PqLayerVersionOptions & { txhash: string; chainId: string; rpc?: string },
 ): Promise<InspectedTransaction | undefined> {
   const f: FetchLike = opts.fetch ?? ((url, init) => globalThis.fetch(url, init));
+  const requestedVersion = pqLayerVersionOption(opts);
   const txhash = opts.txhash.replace(/^0x/i, "").toUpperCase();
   if (!/^[0-9A-F]{64}$/.test(txhash)) throw new QoreSignError("INVALID_ARGUMENT", "a transaction hash is 64 hex characters");
   const { status, body } = await getJson(f, `${base(opts.rest)}/cosmos/tx/v1beta1/txs/${txhash}`);
@@ -206,7 +216,8 @@ export async function inspectTransaction(
           bodyBytes: raw.bodyBytes,
           authInfoBytes: raw.authInfoBytes,
           pqPublicKey: status.publicKey,
-          signBytesVersion: "either",
+          signBytesVersion:
+            requestedVersion ?? (await resolveSignBytesVersion({ rest: opts.rest, fetch: opts.fetch, chainId: opts.chainId })),
         });
         out.pqLayer.verified = r.valid;
         if (r.signBytesVersion) out.pqLayer.signBytesVersion = r.signBytesVersion;

@@ -43,7 +43,9 @@ v1 = BE32(len(B0)) || B0 || BE32(len(A)) || A
 v2 = "qorechain-pqc-hybrid-v2" || BE64(len(chain_id)) || chain_id || v1
 ```
 
-A network verifies exactly one form at a given height. Both public networks verify `v2` since their `v3.1.98` / `v3.2.0` upgrades (mainnet: `v3.2.0` at height 2,981,742); any other network verifies `v2` from genesis. `v1` is only needed to reproduce signatures made before those heights. A client can ask a node which form it verifies by reading `/cosmos/upgrade/v1beta1/applied_plan/{v3.1.98|v3.2.0}`.
+A network verifies exactly one form at a given height. Both public networks verify `v2` since their `v3.1.98` / `v3.2.0` upgrades (mainnet: `v3.2.0` at height 2,981,742); any other network verifies `v2` from genesis. `v1` is only needed to reproduce signatures made before those heights. A client asks a node which form it verifies by reading the protocol feature switches at `/qorechain/pqc/v1/protocol_features` first: `v2` when the switch `pqc-sign-bytes-v2` is listed as enabled, `v1` when it is listed as disabled. Only when that route cannot be read (a node before v3.2.4) or does not list the switch does it fall back to `/cosmos/upgrade/v1beta1/applied_plan/{v3.1.98|v3.2.0}`. The applied plans alone are not enough: a fresh network that reuses the chain id `qorechain-vladi` or `qorechain-diana` has no plan applied but verifies `v2` from genesis.
+
+A check that must match what the network accepts verifies one version, the one the network verifies. Accepting either version is for diagnostics only: `v1` sign-bytes are not bound to a chain id.
 
 The ML-DSA-87 signature is `ML-DSA.Sign(sk, signBytes, ctx = "")`. The network accepts both the deterministic and the hedged variant; QoreSign signs deterministically by default (FIPS 204, `rnd` = 32 zero bytes) so signatures are reproducible against the published vectors.
 

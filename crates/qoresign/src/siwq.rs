@@ -161,8 +161,9 @@ fn split_iso(s: &str) -> Option<([u32; 6], &str, (i64, i64))> {
     Some((n, fraction, offset))
 }
 
+/// The one timestamp grammar of SIWQ, used by create, parse, sign and verify.
 fn is_iso(s: &str) -> bool {
-    split_iso(s).is_some()
+    parse_timestamp_ms(s).is_some()
 }
 
 fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
@@ -177,7 +178,10 @@ fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
 
 /// Unix milliseconds of an ISO 8601 timestamp in the SIWQ form
 /// (`YYYY-MM-DDTHH:MM:SS[.fff...](Z|+HH:MM|-HH:MM)`), or `None` when it is
-/// not one or names an impossible date. Digits past milliseconds are dropped.
+/// not one or names an impossible date or time. Month 01-12, day valid for
+/// the month and year, hour 00-23, minute 00-59, second 00-59 (no leap
+/// second), offset hour 00-23 and offset minute 00-59. Digits past
+/// milliseconds are dropped.
 pub fn parse_timestamp_ms(s: &str) -> Option<i64> {
     let ([year, month, day, hour, minute, second], fraction, (off_h, off_m)) = split_iso(s)?;
     if !(1..=12).contains(&month) || minute > 59 || second > 59 {
@@ -204,13 +208,12 @@ pub fn parse_timestamp_ms(s: &str) -> Option<i64> {
     if day < 1 || day > month_days[month as usize - 1] {
         return None;
     }
+    if hour > 23 {
+        return None;
+    }
     let mut ms: i64 = 0;
     for (i, d) in fraction.bytes().take(3).enumerate() {
         ms += i64::from(d - b'0') * [100, 10, 1][i];
-    }
-    // 24:00:00 is the end of the day, as in ECMAScript's Date.parse.
-    if hour > 24 || (hour == 24 && (minute != 0 || second != 0 || ms != 0)) {
-        return None;
     }
     let days = days_from_civil(i64::from(year), i64::from(month), i64::from(day));
     let secs = days * 86_400 + i64::from(hour) * 3600 + i64::from(minute) * 60 + i64::from(second)
@@ -570,8 +573,8 @@ fn decode_b64(s: &str) -> Option<Vec<u8>> {
 /// A message without `expirationTime` is refused once it is older than
 /// `max_age_seconds` (default 10 minutes), counted from `issuedAt`.
 ///
-/// A timestamp that matches the ISO form but names an impossible date fails
-/// closed: as expired (`expirationTime`) or not yet valid (`notBefore`, `issuedAt`).
+/// A timestamp outside the SIWQ grammar (an impossible date or time included)
+/// is refused as malformed, as it is by create, parse and sign.
 pub fn verify_siwq(args: &VerifySiwqArgs<'_>) -> Result<SiwqFields> {
     let fields = parse_siwq_message(args.message)?;
     if fields.domain != args.domain {

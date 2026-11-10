@@ -48,16 +48,47 @@ function check(cond: boolean, msg: string): void {
   if (!cond) throw new QoreSignError("SIWQ_MALFORMED", msg);
 }
 
-const ISO = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+const ISO = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(?:Z|([+-])(\d{2}):(\d{2}))$/;
 
-/** RFC 3339 timestamp with a real calendar date and time. */
-function isTimestamp(s: string): boolean {
+function daysFromCivil(y: number, m: number, d: number): number {
+  if (m <= 2) y -= 1;
+  const era = Math.floor(y / 400);
+  const yoe = y - era * 400;
+  const mp = (m + 9) % 12;
+  const doy = Math.floor((153 * mp + 2) / 5) + d - 1;
+  const doe = yoe * 365 + Math.floor(yoe / 4) - Math.floor(yoe / 100) + doy;
+  return era * 146_097 + doe - 719_468;
+}
+
+/**
+ * Unix milliseconds of a timestamp in the SIWQ grammar,
+ * `YYYY-MM-DDTHH:MM:SS[.fraction](Z|+HH:MM|-HH:MM)`, or `undefined` when `s` is
+ * not one: month 01-12, day valid for the month and year, hour 00-23, minute
+ * 00-59, second 00-59 (no leap second), offset hour 00-23 and offset minute
+ * 00-59. Digits past milliseconds are dropped. Create, parse, sign and verify
+ * all use it.
+ */
+export function parseSiwqTimestamp(s: string): number | undefined {
   const m = ISO.exec(s);
-  if (!m) return false;
+  if (!m) return undefined;
   const [y, mo, d, h, mi, se] = m.slice(1, 7).map(Number) as [number, number, number, number, number, number];
-  if (mo < 1 || mo > 12 || h > 23 || mi > 59 || se > 59) return false;
-  const daysInMonth = new Date(Date.UTC(y, mo, 0)).getUTCDate();
-  return d >= 1 && d <= daysInMonth && !Number.isNaN(Date.parse(s));
+  if (mo < 1 || mo > 12 || h > 23 || mi > 59 || se > 59) return undefined;
+  const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+  const monthDays = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (d < 1 || d > monthDays[mo - 1]!) return undefined;
+  let offset = 0;
+  if (m[8] !== undefined) {
+    const offH = Number(m[9]);
+    const offM = Number(m[10]);
+    if (offH > 23 || offM > 59) return undefined;
+    offset = (offH * 3600 + offM * 60) * (m[8] === "-" ? -1 : 1);
+  }
+  const ms = Number((m[7] ?? "").slice(0, 3).padEnd(3, "0"));
+  return (daysFromCivil(y, mo, d) * 86_400 + h * 3600 + mi * 60 + se - offset) * 1000 + ms;
+}
+
+function isTimestamp(s: string): boolean {
+  return parseSiwqTimestamp(s) !== undefined;
 }
 
 function validate(f: SiwqFields): void {
@@ -268,16 +299,22 @@ export function verifySiwq(args: VerifySiwqArgs): SiwqFields {
   }
   const now = (args.now ?? new Date()).getTime();
   const skew = (args.clockSkewSeconds ?? 60) * 1000;
-  if (fields.expirationTime !== undefined && Date.parse(fields.expirationTime) <= now) {
+  const time = (s: string): number => {
+    const t = parseSiwqTimestamp(s);
+    if (t === undefined) throw new QoreSignError("SIWQ_MALFORMED", `invalid timestamp ${JSON.stringify(s)}`);
+    return t;
+  };
+  if (fields.expirationTime !== undefined && time(fields.expirationTime) <= now) {
     throw new QoreSignError("SIWQ_EXPIRED", "the sign-in message has expired");
   }
-  if (fields.notBefore !== undefined && Date.parse(fields.notBefore) > now + skew) {
+  if (fields.notBefore !== undefined && time(fields.notBefore) > now + skew) {
     throw new QoreSignError("SIWQ_NOT_YET_VALID", "the sign-in message is not valid yet");
   }
-  if (Date.parse(fields.issuedAt) > now + skew) {
+  const issuedAt = time(fields.issuedAt);
+  if (issuedAt > now + skew) {
     throw new QoreSignError("SIWQ_NOT_YET_VALID", "issuedAt is in the future");
   }
-  if (fields.expirationTime === undefined && now - Date.parse(fields.issuedAt) > maxAgeSeconds * 1000) {
+  if (fields.expirationTime === undefined && now - issuedAt > maxAgeSeconds * 1000) {
     throw new QoreSignError(
       "SIWQ_EXPIRED",
       "the sign-in message has no expirationTime and is older than the maximum age",

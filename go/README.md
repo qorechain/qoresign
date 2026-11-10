@@ -13,6 +13,13 @@ go get github.com/qorechain/qoresign/go
 - `github.com/qorechain/qoresign/go/network`: optional REST helpers (registered
   key lookup, sign-bytes version, simulation, broadcast).
 
+`network.Client.ResolveSignBytesVersion` reads the `pqc-sign-bytes-v2` protocol
+feature switch first and falls back to the applied upgrade plans only when the
+node cannot answer it. `AssertPqLayerMatchesRegisteredKey` checks a layer over
+that one version, or over `AssertPqLayerArgs.SignBytesVersion` when set;
+`AllowLegacyEither` also accepts the other version and is for diagnostics only,
+never for trust decisions.
+
 ## Lanes today
 
 | Lane   | Support |

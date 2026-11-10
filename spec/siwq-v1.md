@@ -32,11 +32,32 @@ Resources:
 - The statement line is optional. Without it the address is followed by two empty lines, as in EIP-4361.
 - `Version` is `1`. `Chain ID` is a QoreChain chain id such as `qorechain-vladi`.
 - `Nonce` is at least 8 alphanumeric characters chosen by the server, single use.
-- Timestamps are RFC 3339 / ISO 8601.
+- Timestamps (`Issued At`, `Expiration Time`, `Not Before`) follow one grammar, see [Timestamps](#timestamps).
 - `Expiration Time`, `Not Before`, `Request ID` and `Resources` are optional and appear in this order.
 - Servers SHOULD require `Expiration Time` and set it a few minutes after `Issued At`. A message without it is accepted only within the verifier's maximum age (see Verification).
 
 A verifier must re-render the parsed fields and refuse a message that does not match byte for byte.
+
+### Timestamps
+
+Every timestamp is an RFC 3339 date-time restricted to this grammar:
+
+```
+timestamp = date "T" time offset
+date      = YYYY "-" MM "-" DD
+time      = HH ":" mm ":" SS [ "." 1*DIGIT ]
+offset    = "Z" / ( "+" / "-" ) oh ":" om
+```
+
+- `YYYY` is exactly four digits (0000 to 9999); every other field is exactly two digits.
+- `MM` is 01 to 12, and `DD` is 01 to the number of days in that month of that year (Gregorian leap years: divisible by 4, except centuries not divisible by 400).
+- `HH` is 00 to 23. `24:00:00` is refused.
+- `mm` is 00 to 59 and `SS` is 00 to 59. A leap second (`SS` = 60) is refused.
+- The fraction has one or more digits; digits past milliseconds are ignored when comparing times.
+- `Z` is uppercase. In a numeric offset, `oh` is 00 to 23 and `om` is 00 to 59, so `+24:00` and `-24:00` are refused.
+- Nothing else is allowed: no lowercase `t` or `z`, no space separator, no missing offset, no offset without a colon, no leading or trailing characters.
+
+Implementations apply the same grammar when creating, parsing, signing and verifying a message: a timestamp outside it is malformed (`SIWQ_MALFORMED`) at every step, so a message one implementation creates is never refused by another for its timestamps.
 
 ## Signatures
 
@@ -82,4 +103,4 @@ A verifier must check, in this order:
 
 ## Test vectors
 
-`vectors/qoresign-v1.json`, field `siwq`.
+`vectors/qoresign-v1.json`, field `siwq`. `vectors/siwq-timestamps-v1.json` lists timestamps that every implementation must accept (with their Unix milliseconds) and ones it must refuse.

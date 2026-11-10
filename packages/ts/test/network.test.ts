@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
 import {
+  PROTOCOL_FEATURES_PATH,
+  SIGN_BYTES_V2_FEATURE,
   assertPqLayerMatchesRegisteredKey,
   fetchPqKeyStatus,
   resolveSignBytesVersion,
@@ -48,6 +50,18 @@ const accountRoute: Route = (url) =>
       }
     : { status: 404, body: {} };
 
+/** The protocol feature answer with the sign-bytes v2 switch in the given state (undefined leaves it out). */
+const features = (enabled?: unknown) => ({
+  features: [
+    { name: "pqc-time-proof", enabled: true, known: true, staged: false },
+    ...(enabled === undefined ? [] : [{ name: SIGN_BYTES_V2_FEATURE, enabled, known: true, staged: false }]),
+  ],
+  height: "4200",
+});
+
+/** accountRoute on a network whose sign-bytes v2 switch is on. */
+const v2Route: Route = (url, init) => (url.endsWith(PROTOCOL_FEATURES_PATH) ? { status: 200, body: features(true) } : accountRoute(url, init));
+
 async function code(p: Promise<unknown>): Promise<string | undefined> {
   try {
     await p;
@@ -80,6 +94,47 @@ describe("sign-bytes version", () => {
     expect(await resolveSignBytesVersion({ rest: "https://r", chainId: "qorechain-vladi", fetch: applied("2981742") })).toBe("v2");
     expect(await resolveSignBytesVersion({ rest: "https://r", chainId: "qorechain-vladi", fetch: applied("0") })).toBe("v1");
     expect(await resolveSignBytesVersion({ rest: "https://r", chainId: "my-new-chain", fetch: applied("0") })).toBe("v2");
+  });
+});
+
+describe("sign-bytes version from the protocol feature switch", () => {
+  // No upgrade plan applied, as on a fresh network that reuses a chain id.
+  const noPlans = (feature: { status: number; body: unknown }): Route => (url) =>
+    url.endsWith(PROTOCOL_FEATURES_PATH) ? feature : url.includes("applied_plan") ? { status: 200, body: { plan: null } } : { status: 404, body: {} };
+  const plans = ["GET https://r/cosmos/upgrade/v1beta1/applied_plan/v3.2.0", "GET https://r/cosmos/upgrade/v1beta1/applied_plan/v3.1.98"];
+  const featureCall = `GET https://r${PROTOCOL_FEATURES_PATH}`;
+
+  it.each([
+    ["an enabled switch on a legacy chain id with no plan applied", { status: 200, body: features(true) }, "v2", false],
+    ["an enabled switch spelled as a string", { status: 200, body: features("true") }, "v2", false],
+    ["a listed but disabled switch", { status: 200, body: features(false) }, "v1", false],
+    ["a route that is not served (404)", { status: 404, body: { code: 5, message: "Not Implemented" } }, "v1", true],
+    ["a route that is not implemented (501)", { status: 501, body: {} }, "v1", true],
+    ["an answer without a feature list", { status: 200, body: { features: "x" } }, "v1", true],
+    ["an invalid enabled value", { status: 200, body: features(7) }, "v1", true],
+    ["a switch that is not listed", { status: 200, body: features() }, "v1", true],
+  ] as const)("%s", async (_name, feature, want, fallback) => {
+    const calls: string[] = [];
+    const v = await resolveSignBytesVersion({ rest: "https://r", chainId: "qorechain-diana", fetch: mockFetch(noPlans(feature), calls) });
+    expect(v).toBe(want);
+    expect(calls).toEqual(fallback ? [featureCall, ...plans] : [featureCall]);
+  });
+
+  it("falls back on an unreadable answer and on a request that fails", async () => {
+    const notJson: FetchLike = async (url) => ({
+      ok: true,
+      status: 200,
+      json: async () => {
+        if (url.endsWith(PROTOCOL_FEATURES_PATH)) throw new SyntaxError("not json");
+        return { height: url.endsWith("v3.2.0") ? "2981742" : "0" };
+      },
+    });
+    expect(await resolveSignBytesVersion({ rest: "https://r", chainId: "qorechain-vladi", fetch: notJson })).toBe("v2");
+    const down: FetchLike = async (url) => {
+      if (url.endsWith(PROTOCOL_FEATURES_PATH)) throw new TypeError("fetch failed");
+      return { ok: true, status: 200, json: async () => ({ plan: null }) };
+    };
+    expect(await resolveSignBytesVersion({ rest: "https://r", chainId: "qorechain-diana", fetch: down })).toBe("v1");
   });
 });
 
@@ -167,7 +222,7 @@ describe("checks against the registered key", () => {
     const body = new Uint8Array([0x12, 0x01, 0x6d]);
     const auth = new Uint8Array([0x12, 0x00]);
     const layered = signPqLayer({ chainId: "qorechain-diana", bodyBytes: body, authInfoBytes: auth, pqKey }).bodyBytes;
-    const fetch = mockFetch(accountRoute);
+    const fetch = mockFetch(v2Route);
     const ok = await assertPqLayerMatchesRegisteredKey({ rest: "https://r", fetch, chainId: "qorechain-diana", signer: address, bodyBytes: layered, authInfoBytes: auth });
     expect(ok.valid).toBe(true);
     expect(
@@ -177,6 +232,43 @@ describe("checks against the registered key", () => {
     expect(
       await code(assertPqLayerMatchesRegisteredKey({ rest: "https://r", fetch: none, chainId: "qorechain-diana", signer: address, bodyBytes: layered, authInfoBytes: auth })),
     ).toBe("KEY_NOT_REGISTERED");
+  });
+
+  it("checks only the version the network verifies", async () => {
+    const body = new Uint8Array([0x12, 0x01, 0x6d]);
+    const auth = new Uint8Array([0x12, 0x00]);
+    const v1 = signPqLayer({ chainId: "qorechain-diana", bodyBytes: body, authInfoBytes: auth, pqKey, signBytesVersion: "v1" }).bodyBytes;
+    const args = { rest: "https://r", chainId: "qorechain-diana", signer: address, bodyBytes: v1, authInfoBytes: auth };
+
+    let err: unknown;
+    try {
+      await assertPqLayerMatchesRegisteredKey({ ...args, fetch: mockFetch(v2Route) });
+    } catch (e) {
+      err = e;
+    }
+    expect((err as QoreSignError).code).toBe("PQ_SIGNATURE_INVALID");
+    expect((err as QoreSignError).details).toMatchObject({ reason: "invalid_signature" });
+
+    const legacy = await assertPqLayerMatchesRegisteredKey({ ...args, fetch: mockFetch(v2Route), allowLegacyEither: true });
+    expect(legacy).toEqual({ valid: true, signBytesVersion: "v1" });
+
+    // An explicit version is used as given, without asking the network.
+    const calls: string[] = [];
+    const explicit = await assertPqLayerMatchesRegisteredKey({ ...args, fetch: mockFetch(accountRoute, calls), signBytesVersion: "v1" });
+    expect(explicit).toEqual({ valid: true, signBytesVersion: "v1" });
+    expect(calls.every((c) => c.includes("/qorechain/pqc/v1/account/"))).toBe(true);
+    expect(await code(assertPqLayerMatchesRegisteredKey({ ...args, fetch: mockFetch(accountRoute), signBytesVersion: "v2" }))).toBe(
+      "PQ_SIGNATURE_INVALID",
+    );
+    expect(
+      await code(
+        assertPqLayerMatchesRegisteredKey({ ...args, fetch: mockFetch(v2Route), signBytesVersion: "either" as unknown as "v2" }),
+      ),
+    ).toBe("INVALID_ARGUMENT");
+
+    // A network that verifies v1 (switch listed but off) accepts the v1 layer.
+    const off: Route = (url, init) => (url.endsWith(PROTOCOL_FEATURES_PATH) ? { status: 200, body: features(false) } : accountRoute(url, init));
+    expect(await assertPqLayerMatchesRegisteredKey({ ...args, fetch: mockFetch(off) })).toEqual({ valid: true, signBytesVersion: "v1" });
   });
 
   it("verifies a sign-in against the chain", async () => {

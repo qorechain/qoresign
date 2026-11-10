@@ -27,7 +27,7 @@ const finalDoc = { ...signDoc, bodyBytes }; // sign this with the secp256k1 key,
 Rules that keep the user safe:
 
 - Show the user the messages and fee from `bodyBytes` / `authInfoBytes` before signing, the same as for any `signDirect` request. The ML-DSA-87 signature covers the fee.
-- When a dApp sends a body that already carries a PQC layer, check it with `assertPqLayerMatchesRegisteredKey` (from `@qorechain/qoresign/network`) before adding your classical signature; a layer that does not verify protects nothing.
+- When a dApp sends a body that already carries a PQC layer, check it with `assertPqLayerMatchesRegisteredKey` (from `@qorechain/qoresign/network`) before adding your classical signature; a layer that does not verify protects nothing. It checks the layer over the one sign-bytes version the network verifies (read from the node, or passed as `signBytesVersion`); `allowLegacyEither` also accepts the other version and is for diagnostics only, never for deciding whether to sign.
 - Register the key once per account with `buildRegisterPqKeyMessage`, signed in `classicalOnly` mode (see [`examples/register-and-send`](../../examples/register-and-send)).
 - After broadcast, read the committed transaction back and call `evaluateLayerState`; `downgraded` means the layer did not reach the chain.
 

@@ -14,6 +14,8 @@ import {
   fromHex,
   hybridSignBytes,
   messagePqSignBytes,
+  parseSiwqMessage,
+  parseSiwqTimestamp,
   signMessage,
   verifyMessage,
   proofOfPossessionMessage,
@@ -102,5 +104,61 @@ describe("vectors/qoresign-v1.json", () => {
         now: new Date(s.verifyAt),
       }).address,
     ).toBe(s.fields.address);
+  });
+});
+
+describe("vectors/siwq-timestamps-v1.json", () => {
+  const t = JSON.parse(readFileSync(new URL("../../../vectors/siwq-timestamps-v1.json", import.meta.url), "utf8")) as {
+    format: string;
+    valid: { timestamp: string; unixMs: number }[];
+    invalid: string[];
+  };
+  const classical = deriveClassicalKey({ mnemonic: v.mnemonic });
+  const pq = deriveCanonicalPqKey({ mnemonic: v.mnemonic, address: v.accounts.secp256k1.address });
+  const base = v.siwq.fields as SiwqFields;
+  const issuedLine = `Issued At: ${base.issuedAt}`;
+  const codeOf = (fn: () => unknown): string | undefined => {
+    try {
+      fn();
+    } catch (err) {
+      return err instanceof QoreSignError ? err.code : String(err);
+    }
+    return undefined;
+  };
+
+  it("has cases", () => {
+    expect(t.format).toBe("qoresign-siwq-timestamps-v1");
+    expect(t.valid.length).toBeGreaterThan(0);
+    expect(t.invalid.length).toBeGreaterThan(0);
+    expect(v.siwq.message).toContain(issuedLine);
+  });
+
+  it.each(t.valid)("accepts $timestamp", ({ timestamp, unixMs }) => {
+    expect(parseSiwqTimestamp(timestamp)).toBe(unixMs);
+    const msg = createSiwqMessage({ ...base, issuedAt: timestamp, expirationTime: timestamp, notBefore: timestamp });
+    parseSiwqMessage(msg);
+    signSiwq({ message: msg, classicalKey: classical, pqKey: pq });
+  });
+
+  it.each(t.invalid)("refuses %j everywhere", (ts) => {
+    expect(parseSiwqTimestamp(ts)).toBeUndefined();
+    expect(codeOf(() => createSiwqMessage({ ...base, issuedAt: ts }))).toBe("SIWQ_MALFORMED");
+    expect(codeOf(() => createSiwqMessage({ ...base, expirationTime: ts }))).toBe("SIWQ_MALFORMED");
+    expect(codeOf(() => createSiwqMessage({ ...base, expirationTime: undefined, notBefore: ts }))).toBe("SIWQ_MALFORMED");
+    const msg = (v.siwq.message as string).replace(issuedLine, `Issued At: ${ts}`);
+    expect(codeOf(() => parseSiwqMessage(msg))).toBe("SIWQ_MALFORMED");
+    expect(codeOf(() => signSiwq({ message: msg, classicalKey: classical, pqKey: pq }))).toBe("SIWQ_MALFORMED");
+    expect(
+      codeOf(() =>
+        verifySiwq({
+          message: msg,
+          signature: v.siwq.signature,
+          domain: "app.example.com",
+          nonce: "a1b2c3d4e5",
+          pqPublicKey: pq.publicKey,
+          now: new Date("2026-10-27T10:00:30Z"),
+        }),
+      ),
+    ).toBe("SIWQ_MALFORMED");
   });
 });

@@ -27,6 +27,8 @@ Two entry points:
 | `@qorechain/qoresign` | offline: keys and addresses, hybrid signing, verification, key registration, Sign In With QoreChain, lane rules |
 | `@qorechain/qoresign/network` | REST helpers: key status, sign-bytes version, simulation, broadcast, sign-in verification against the chain |
 
+`resolveSignBytesVersion` reads the `pqc-sign-bytes-v2` protocol feature switch first and falls back to the applied upgrade plans only when the node cannot answer it. `assertPqLayerMatchesRegisteredKey` and `inspectTransaction` check a layer over that one version, or over `signBytesVersion` when you pass it; `allowLegacyEither: true` also accepts the other version and is for diagnostics only, never for trust decisions.
+
 Documentation, specifications and examples: <https://github.com/qorechain/qoresign>.
 
 Apache-2.0. Copyright 2026 QoreChain Association.

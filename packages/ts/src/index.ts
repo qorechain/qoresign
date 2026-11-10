@@ -76,6 +76,7 @@ export {
   adr36SignBytes,
   createSiwqMessage,
   parseSiwqMessage,
+  parseSiwqTimestamp,
   signSiwq,
   siwqPqSignBytes,
   verifySiwq,

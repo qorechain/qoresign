@@ -34,6 +34,8 @@ function server(txBytes: Uint8Array, registered = true): FetchLike {
     if (url.includes("/account_info/")) return json(200, { info: { account_number: "7" } });
     if (url.includes("/qorechain/pqc/v1/account/"))
       return json(200, registered ? { found: true, account: { public_key: toBase64(pq.publicKey), algorithm_id: 1, possession_proven: true } } : { found: false });
+    if (url.endsWith("/qorechain/pqc/v1/protocol_features"))
+      return json(200, { features: [{ name: "pqc-sign-bytes-v2", enabled: true, known: true, staged: false }], height: "42" });
     if (url.includes("/evm_window/"))
       return json(200, { found: true, live: true, opened_height: "10", expiry_height: "3610", max_txs: "10", used_txs: "1", max_value: "25000000", used_value: "0", remaining_blocks: "3000", remaining_txs: "9", remaining_value: "25000000", native_only: false, allowed_targets: ["0xabc"] });
     return json(404, {});
@@ -63,6 +65,16 @@ describe("inspectTransaction", () => {
     const plain = await inspectTransaction({ rest: "https://r", chainId, txhash: "ab".repeat(32), fetch: server(classicalOnly.txBytes) });
     expect(plain?.pqLayer.present).toBe(false);
     expect(plain?.tier).toBe("shake");
+  });
+
+  it("checks the layer over the version the network verifies, either version only when asked", async () => {
+    const v1 = signHybrid({ chainId, accountNumber: 7, bodyBytes: body, authInfoBytes: authInfo, classicalKey: classical, pqKey: pq, signBytesVersion: "v1" });
+    const strict = await inspectTransaction({ rest: "https://r", chainId, txhash: "ab".repeat(32), fetch: server(v1.txBytes) });
+    expect(strict?.pqLayer).toEqual({ present: true, count: 1, algorithmId: 1, verified: false, reason: "invalid_signature" });
+    const asked = await inspectTransaction({ rest: "https://r", chainId, txhash: "ab".repeat(32), fetch: server(v1.txBytes), signBytesVersion: "v1" });
+    expect(asked?.pqLayer).toMatchObject({ verified: true, signBytesVersion: "v1" });
+    const legacy = await inspectTransaction({ rest: "https://r", chainId, txhash: "ab".repeat(32), fetch: server(v1.txBytes), allowLegacyEither: true });
+    expect(legacy?.pqLayer).toMatchObject({ verified: true, signBytesVersion: "v1" });
   });
 
   it("returns undefined for an unknown hash and refuses a malformed one", async () => {

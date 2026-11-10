@@ -10,7 +10,10 @@ import { QoreSignError } from "./errors.js";
 import type { SignBytesVersion } from "./sign.js";
 import { verifyMessage, type MessageSignature } from "./message.js";
 import { verifySiwq, type SiwqFields, type VerifySiwqArgs } from "./siwq.js";
+import { pqLayerVersionOption, type PqLayerVersionOptions } from "./layer-version.js";
 import { verifyPqLayer, type PqLayerResult } from "./verify.js";
+
+export type { PqLayerVersionOptions };
 
 export type FetchLike = (
   url: string,
@@ -84,8 +87,75 @@ export async function fetchAppliedPlanHeight(opts: RestOptions & { name: string 
   return BigInt(typeof body.height === "string" && body.height !== "" ? body.height : "0");
 }
 
-/** The hybrid sign-bytes version the network verifies now. */
+/** REST route of the network's protocol feature switches. */
+export const PROTOCOL_FEATURES_PATH = "/qorechain/pqc/v1/protocol_features";
+
+/** The protocol feature switch that makes the network verify v2 hybrid sign-bytes. */
+export const SIGN_BYTES_V2_FEATURE = "pqc-sign-bytes-v2";
+
+/** A JSON boolean, or the strings "true" / "false"; absent or null is false. */
+function readBool(v: unknown): boolean | undefined {
+  if (v === undefined || v === null) return false;
+  if (typeof v === "boolean") return v;
+  if (typeof v === "string") {
+    const t = v.trim();
+    if (t === "" || t === "false") return false;
+    if (t === "true") return true;
+  }
+  return undefined;
+}
+
+/**
+ * Read {@link PROTOCOL_FEATURES_PATH} and report whether the switch `name` is
+ * listed and, if so, whether it is enabled. Throws `NETWORK_UNAVAILABLE` when
+ * the network cannot be asked or does not serve the route (nodes before
+ * v3.2.4), or when the answer cannot be read.
+ */
+export async function fetchProtocolFeature(
+  opts: RestOptions & { name: string },
+): Promise<{ listed: boolean; enabled: boolean }> {
+  const { status, body } = await getJson(opts, PROTOCOL_FEATURES_PATH);
+  if (status < 200 || status >= 300) {
+    throw new QoreSignError("NETWORK_UNAVAILABLE", `could not read the protocol features (HTTP ${status})`);
+  }
+  const list = body?.features;
+  if (!Array.isArray(list)) throw new QoreSignError("NETWORK_UNAVAILABLE", "the protocol features answer has no feature list");
+  let listed = false;
+  let enabled = false;
+  for (const item of list) {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) {
+      throw new QoreSignError("NETWORK_UNAVAILABLE", "the protocol features answer has an invalid entry");
+    }
+    const f = item as Record<string, unknown>;
+    if (typeof f.name !== "string" || f.name.trim() !== opts.name) continue;
+    const on = readBool(f.enabled);
+    if (on === undefined) {
+      throw new QoreSignError("NETWORK_UNAVAILABLE", `the protocol feature ${opts.name} has an invalid enabled value`);
+    }
+    listed = true;
+    enabled = enabled || on;
+  }
+  return { listed, enabled };
+}
+
+/**
+ * The hybrid sign-bytes version the network verifies now.
+ *
+ * Reads the protocol feature switch {@link SIGN_BYTES_V2_FEATURE} first: v2
+ * when it is enabled, v1 when it is listed but disabled. Only when that query
+ * fails (no answer, a node that does not serve the route, an unreadable
+ * answer) or does not list the switch does it fall back to the applied
+ * upgrade plans: v2 once v3.1.98 or v3.2.0 is applied; before that v1 on the
+ * networks that predate v2 (`qorechain-vladi`, `qorechain-diana`) and v2 on
+ * any other chain.
+ */
 export async function resolveSignBytesVersion(opts: RestOptions & { chainId: string }): Promise<SignBytesVersion> {
+  try {
+    const feature = await fetchProtocolFeature({ ...opts, name: SIGN_BYTES_V2_FEATURE });
+    if (feature.listed) return feature.enabled ? "v2" : "v1";
+  } catch (err) {
+    if (!(err instanceof QoreSignError) || err.code !== "NETWORK_UNAVAILABLE") throw err;
+  }
   const applied: Record<string, bigint> = {};
   for (const name of SIGN_BYTES_V2_UPGRADES) applied[name] = await fetchAppliedPlanHeight({ ...opts, name });
   return signBytesVersionForApplied(opts.chainId, applied);
@@ -93,12 +163,16 @@ export async function resolveSignBytesVersion(opts: RestOptions & { chainId: str
 
 /**
  * Check a dApp-prepared body's ML-DSA-87 layer against the key the signer has
- * registered on chain. Throws when the layer is missing, malformed or invalid,
- * when the account has no key, or when the key cannot be read.
+ * registered on chain, over the one sign-bytes version the network verifies
+ * (or `signBytesVersion`). Throws when the layer is missing, malformed or
+ * invalid, when the account has no key, or when the key or the version
+ * cannot be read.
  */
 export async function assertPqLayerMatchesRegisteredKey(
-  opts: RestOptions & { chainId: string; signer: string; bodyBytes: Uint8Array; authInfoBytes: Uint8Array },
+  opts: RestOptions &
+    PqLayerVersionOptions & { chainId: string; signer: string; bodyBytes: Uint8Array; authInfoBytes: Uint8Array },
 ): Promise<PqLayerResult> {
+  const given = pqLayerVersionOption(opts);
   const status = await fetchPqKeyStatus({ ...opts, address: opts.signer });
   if (!status.registered || !status.publicKey) {
     throw new QoreSignError("KEY_NOT_REGISTERED", `${opts.signer} has no ML-DSA-87 key on the network`);
@@ -108,7 +182,7 @@ export async function assertPqLayerMatchesRegisteredKey(
     bodyBytes: opts.bodyBytes,
     authInfoBytes: opts.authInfoBytes,
     pqPublicKey: status.publicKey,
-    signBytesVersion: "either",
+    signBytesVersion: given ?? (await resolveSignBytesVersion(opts)),
   });
   if (!result.valid) {
     const code = result.reason === "missing" ? "PQ_LAYER_MISSING" : result.reason === "duplicated" ? "PQ_LAYER_DUPLICATED" : "PQ_SIGNATURE_INVALID";
